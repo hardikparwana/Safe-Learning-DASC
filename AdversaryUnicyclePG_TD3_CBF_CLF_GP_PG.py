@@ -456,11 +456,11 @@ N = 3
 
 GP_list = build_GP_model(N)
 
-# agentF = follower(np.array([0,0.2,0]),dt)
-# agentT = target(np.array([1,0]),dt)
-
 agentF = follower(np.array([0,0.2,0]),dt)
-agentT = target(np.array([1.4,0]),dt)
+agentT = target(np.array([1,0]),dt)
+
+# agentF = follower(np.array([0,0.2,0]),dt)
+# agentT = target(np.array([1.4,0]),dt)
 
 
 
@@ -592,12 +592,12 @@ for k in range(0,400):
 
     # update_GP_dynamics(GP_list,N,np.array([FX_prev[2],FX_prev[2],FX_prev[2]] ), np.array([d1_obs,d2_obs,d3_obs]))
     
-    if len(replay_buffer_x)==batch_size:
-        # update_GP_dynamics(GP_list,Xgp, obs_d1, 0, agentF.X[2,0])
-        # update_GP_dynamics(GP_list,Xgp, obs_d2, 1, agentF.X[2,0])
+    if 1:#len(replay_buffer_x)==batch_size:
+        update_GP_dynamics(GP_list,Xgp, obs_d1, 0, agentF.X[2,0])
+        update_GP_dynamics(GP_list,Xgp, obs_d2, 1, agentF.X[2,0])
         update_GP_dynamics(GP_list,Xgp, obs_d3, 2, agentF.X[2,0])
-        update_GP_dynamics_buffer(GP_list,replay_buffer_x, replay_buffer_d1, 0, Xgp, obs_d1)
-        update_GP_dynamics_buffer(GP_list,replay_buffer_x, replay_buffer_d2, 1, Xgp, obs_d2)
+        # update_GP_dynamics_buffer(GP_list,replay_buffer_x, replay_buffer_d1, 0, Xgp, obs_d1)
+        # update_GP_dynamics_buffer(GP_list,replay_buffer_x, replay_buffer_d2, 1, Xgp, obs_d2)
         # update_GP_dynamics_buffer(GP_list,replay_buffer_x, replay_buffer_d3, 2, Xgp, obs_d3)
 
     # lines, areas, bodyF = agentF.render(lines,areas,bodyF)
@@ -628,46 +628,56 @@ plt.legend()
 plt.fill_between(theta, d - d_std, d + d_std, alpha=0.2, color = 'm')
 plt.title("Unknown Dynamics Estimation")
 
-plt.figure()
-plt.subplot(3,1,1)
-theta = np.linspace(-1,1,100)
-d, d_std = test_GP_dynamics( GP_list,theta, 0  )
-d_true = true_d(theta,0)
-plt.plot(theta,d_true,'r')
+# plt.figure()
+# theta = np.linspace(-1,1,100)
+# d, d_std = test_GP_dynamics( GP_list,theta, 0  )
+# d_true = true_d(theta,0)
+# plt.plot(theta,d_true,'r')
+
+# plt.plot(theta,d)
+# plt.fill_between(theta, d - d_std, d + d_std, alpha=0.2, color = 'm')
+# plt.title("d1")
+
+# plt.figure()
+# plt.subplot(3,1,1)
+# theta = np.linspace(-1,1,100)
+# d, d_std = test_GP_dynamics( GP_list,theta, 0  )
+# d_true = true_d(theta,0)
+# plt.plot(theta,d_true,'r')
 
 
-# print("d1",d)
+# # print("d1",d)
     
-# print(f"d size:{d.size}, shape:{d.shape}, d:{d}, theta:{theta}")
-# print("d_std:",d_std)
-# print("d",d)
-plt.plot(theta,d)
-plt.fill_between(theta, d - d_std, d + d_std, alpha=0.2, color = 'm')
-plt.title("d1")
+# # print(f"d size:{d.size}, shape:{d.shape}, d:{d}, theta:{theta}")
+# # print("d_std:",d_std)
+# # print("d",d)
+# plt.plot(theta,d)
+# plt.fill_between(theta, d - d_std, d + d_std, alpha=0.2, color = 'm')
+# plt.title("d1")
 
-plt.subplot(3,1,2)
-theta = np.linspace(-1,1,100)
-d, d_std = test_GP_dynamics( GP_list,theta, 1  )
-d_true = true_d(theta,1)
-plt.plot(theta,d_true,'r')
-# print(f"d size:{d.size}, shape:{d.shape}, d:{d}, theta:{theta}")
-# print("d_std:",d_std)
-# print("d",d)
-plt.plot(theta,d)
-plt.fill_between(theta, d - d_std, d + d_std, alpha=0.2, color = 'm')
-plt.title("d2")
+# plt.subplot(3,1,2)
+# theta = np.linspace(-1,1,100)
+# d, d_std = test_GP_dynamics( GP_list,theta, 1  )
+# d_true = true_d(theta,1)
+# plt.plot(theta,d_true,'r')
+# # print(f"d size:{d.size}, shape:{d.shape}, d:{d}, theta:{theta}")
+# # print("d_std:",d_std)
+# # print("d",d)
+# plt.plot(theta,d)
+# plt.fill_between(theta, d - d_std, d + d_std, alpha=0.2, color = 'm')
+# plt.title("d2")
 
-plt.subplot(3,1,3)
-theta = np.linspace(-1,1,100)
-d, d_std = test_GP_dynamics( GP_list,theta, 2  )
-d_true = true_d(theta,2)
-plt.plot(theta,d_true,'r')
-# print(f"d size:{d.size}, shape:{d.shape}, d:{d}, theta:{theta}")
-# print("d_std:",d_std)
-# print("d",d)
-plt.plot(theta,d)
-plt.fill_between(theta, d - d_std, d + d_std, alpha=0.2, color = 'm')
-plt.title("d3")
+# plt.subplot(3,1,3)
+# theta = np.linspace(-1,1,100)
+# d, d_std = test_GP_dynamics( GP_list,theta, 2  )
+# d_true = true_d(theta,2)
+# plt.plot(theta,d_true,'r')
+# # print(f"d size:{d.size}, shape:{d.shape}, d:{d}, theta:{theta}")
+# # print("d_std:",d_std)
+# # print("d",d)
+# plt.plot(theta,d)
+# plt.fill_between(theta, d - d_std, d + d_std, alpha=0.2, color = 'm')
+# plt.title("d3")
 
 # plt.figure()
 # plt.plot(theta,d)
@@ -680,43 +690,43 @@ plt.xlabel('time (s)')
 plt.legend()
 plt.title('Gaussian Process Prediction')
 
-plt.figure()
+# plt.figure()
 
-plt.subplot(3,1,1)
-plt.plot(obs_d1,'g*')
-plt.plot(true_d1,'r')
-plt.plot(pred_d1,'c')
+# plt.subplot(3,1,1)
+# plt.plot(obs_d1,'g*')
+# plt.plot(true_d1,'r')
+# plt.plot(pred_d1,'c')
 
-plt.subplot(3,1,2)
-plt.plot(obs_d2,'g*')
-plt.plot(true_d2,'r')
-plt.plot(pred_d2,'c')
+# plt.subplot(3,1,2)
+# plt.plot(obs_d2,'g*')
+# plt.plot(true_d2,'r')
+# plt.plot(pred_d2,'c')
 
-plt.subplot(3,1,3)
-plt.plot(obs_d3,'g*')
-plt.plot(true_d3,'r')
-plt.plot(pred_d3,'c')
+# plt.subplot(3,1,3)
+# plt.plot(obs_d3,'g*')
+# plt.plot(true_d3,'r')
+# plt.plot(pred_d3,'c')
 
-plt.figure()
-plt.plot(debug_value,'k')
-
-
-hor = np.zeros(len(h1p))
-plt.figure()
-plt.subplot(3,1,1)
-plt.plot(h1p,'g')
-plt.plot(hor,'k')
-
-plt.subplot(3,1,2)
-plt.plot(h2p,'g')
-plt.plot(hor,'k')
+# plt.figure()
+# plt.plot(debug_value,'k')
 
 
-plt.subplot(3,1,3)
-plt.plot(h3p,'g')
-plt.plot(hor,'k')
+# hor = np.zeros(len(h1p))
+# plt.figure()
+# plt.subplot(3,1,1)
+# plt.plot(h1p,'g')
+# plt.plot(hor,'k')
 
-plt.title("barrier functions")
+# plt.subplot(3,1,2)
+# plt.plot(h2p,'g')
+# plt.plot(hor,'k')
+
+
+# plt.subplot(3,1,3)
+# plt.plot(h3p,'g')
+# plt.plot(hor,'k')
+
+# plt.title("barrier functions")
 
 
 
@@ -728,8 +738,9 @@ plt.show()
 
 
 
-print("h1 first",h1p[0])
-print("h2 first",h2p[0])
-print("h3 first",h3p[0])
+# print("h1 first",h1p[0])
+# print("h2 first",h2p[0])
+# print("h3 first",h3p[0])
+
 
     

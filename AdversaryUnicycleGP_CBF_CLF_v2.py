@@ -172,9 +172,9 @@ def build_GP_model(N):
 @ignore_warnings(category=ConvergenceWarning)
 def update_GP_dynamics(GP_list,X,Y, index, curr_X):
     # X, Y = filter_data(X,Y,curr_X)
-    print("start")
+    # print("start")
     GP_list[index].fit(np.asarray(X).reshape(-1,1),np.asarray(Y).reshape(-1,1))
-    print("done")
+    # print("done")
 
 
 def filter_data(obs_x,obs_value,curr_x,thres=0.5):
@@ -466,7 +466,7 @@ debug_value = []
 
 Xgp = []
 
-for k in range(0,30):
+for k in range(0,60):
 
     uL = 0.5
     vL = 3.6*np.sin(np.pi*t) #  0.1 # 1.2
@@ -562,6 +562,30 @@ print(pred_d1)
 print(true_d1)
 print("DONE!!")
 plt.ioff()
+
+
+plt.figure()
+theta = np.linspace(-1,2,100)
+d, d_std = test_GP_dynamics( GP_list,theta, 0  )
+d_true = true_d(theta,0)
+plt.plot(theta,d_true,'r',label='True Dyanmics')
+plt.plot(theta,d,label='Estimated Dynamics')
+plt.legend()
+plt.fill_between(theta, d - d_std, d + d_std, alpha=0.2, color = 'm')
+plt.title("Supervised Unknown Dynamics Estimation")
+
+plt.figure()
+plt.plot(obs_d1,'g*',label='True Dynamics')
+plt.plot(true_d1,'r',label='Training Points')
+plt.plot(pred_d1,'c',label='Predicted Valaues')
+plt.xlabel('time (s)')
+plt.legend()
+plt.title('Supervised Gaussian Process Prediction')
+
+plt.show()
+
+
+exit()
 
 plt.figure()
 theta = np.linspace(-1,1,100)
