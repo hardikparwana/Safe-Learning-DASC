@@ -14,148 +14,27 @@ from collections import namedtuple, deque
 import torch.optim as optim
 import random
 import matplotlib.pyplot as plt
+
+from robot_models.Unicycle2D import *
+from robot_models.SingleIntegrator import *
 #%matplotlib inline 
 
 import os
 import time
 
-from cvxopt import matrix
-from cvxopt import solvers
-
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, WhiteKernel, ConstantKernel as C
-
 
 from sklearn.utils.testing import ignore_warnings
 from sklearn.exceptions import ConvergenceWarning
 
+import cvxpy as cp
 
 FoV = 60*np.pi/180
 max_D = 3
 min_D = 0.3
 
 
-class follower:
-    
-    def __init__(self,X0,dt):
-        X0 = X0.reshape(-1,1)
-        self.X  = X0
-        self.dt = dt
-        self.d1 = 1*np.sin(self.X[2][0])**2 + 1*np.sin(self.X[2][0]*16) #sin(u)
-        self.d2 = 1*np.sin(self.X[2,0])**2 + 1*np.sin(self.X[2,0]*16)
-        self.d3 = 0.3
-        self.f = np.array([0,0,0]).reshape(-1,1)
-        self.g = np.array([ [np.cos(X0[2,0]),0],[np.sin(X0[2,0]),0],[0,1] ])
-        self.f_corrected = np.array([0,0,0]).reshape(-1,1)
-        self.g_corrected = np.array([ [0,0],[0,0],[0,0] ])
-        
-    def step(self,U):
-        U = U.reshape(-1,1)
-        self.g = np.array([ [np.cos(self.X[2,0]),0],[np.sin(self.X[2,0]),0],[0,1] ])
-
-        # disturbance term
-        self.d1 = 1*np.sin(self.X[2][0])**2 + 1*np.sin(self.X[2][0]*16) #sin(u)
-        self.d2 = 1*np.sin(self.X[2,0])**2 + 1*np.sin(self.X[2,0]*16)
-        self.d3 = 0.3
-        
-        extra_f = np.array([self.d1*np.cos(self.X[2][0]),self.d2*np.sin(self.X[2][0]),self.d3]).reshape(-1,1)
-        extra_g = np.array([ [0,0],[0,0],[0,0] ])
-        
-        self.X = self.X + (extra_f + extra_g @ U + self.f + self.g @ U)*self.dt
-    
-        self.X[2] = wrap_angle(self.X[2])
-        
-        return self.X
-
-    def step_sim(self,U):
-        
-        U = U.reshape(-1,1)
-        g_sim = np.array([ [np.cos(self.X[2,0]),0],[np.sin(self.X[2,0]),0],[0,1] ])
-
-        # disturbance term
-        self.d1_sim = 1*np.sin(self.X[2][0])**2 + 1*np.sin(self.X[2][0]*16) #sin(u)
-        self.d2_sim = 1*np.sin(self.X[2,0])**2 + 1*np.sin(self.X[2,0]*16)
-        self.d3_sim = 0.3
-        
-        extra_f_sim = np.array([self.d1*np.cos(self.X[2][0]),self.d2*np.sin(self.X[2][0]),self.d3]).reshape(-1,1)
-        extra_g_sim = np.array([ [0,0],[0,0],[0,0] ])
-       
-        X_sim = self.X + (extra_f + extra_g @ U + self.f + self.g @ U)*self.dt
-    
-        X_sim[2] = wrap_angle(X_sim[2])
-        
-        return X_sim
-    
-    def render(self,lines,areas,body):
-        length = 3
-        # FoV = np.pi/3   # 60 degrees
-
-        x = np.array([self.X[0,0],self.X[1,0]])
-        # print("X",self.X)
-        theta = self.X[2][0]
-        theta1 = theta + FoV/2
-        theta2 = theta - FoV/2
-        e1 = np.array([np.cos(theta1),np.sin(theta1)])
-        e2 = np.array([np.cos(theta2),np.sin(theta2)])
-
-        P1 = x + length*e1
-        P2 = x + length*e2  
-
-        triangle_hx = [x[0] , P1[0], P2[0], x[0] ]
-        triangle_hy = [x[1] , P1[1], P2[1], x[1] ]
-        
-        triangle_v = [ x,P1,P2,x ]  
-        # print("triangle_v",triangle_v)
-
-        lines.set_data(triangle_hx,triangle_hy)
-        areas.set_xy(triangle_v)
-
-        length2 = 3
-
-        # scatter plot update
-        body.set_offsets([x[0],x[1]])
-#         sc.set_offsets(np.c_[x,y])
-
-        return lines, areas, body
-       
-class target:
-    
-    def __init__(self,X0,dt):
-        X0 = X0.reshape(-1,1)
-        self.X = X0
-        self.V = np.array([0,0]).reshape(-1,1)
-        self.dt = dt
-        self.t0 = 0
-        self.speed = 0
-        self.theta = 0
-        
-    def step(self,a,alpha): #Just holonomic X,T acceleration
-        
-        if (self.speed<2):
-            self.speed = self.speed + a*self.dt
-
-        self.V[0,0] = a
-        self.V[1,0] = alpha
-
-        self.X = self.X + np.array([a,alpha]).reshape(-1,1)*dt
-        return self.X
-
-    def step_sim(self,a,alpha): #Just holonomic X,T acceleration
-        
-        X_sim = self.X + np.array([a,alpha])*dt
-        return X_sim
-    
-    def render(self,body):
-        length = 3
-        # FoV = np.pi/3
-
-        x = np.array([self.X[0,0],self.X[1,0]])
-
-        # scatter plot update
-        body.set_offsets([x[0],x[1]])
-
-        return body
-    
 def wrap_angle(angle):
     if angle>np.pi:
         angle = angle - 2*np.pi
@@ -216,157 +95,87 @@ def CBF_loss(agent,target,u,w):
 
     alpha = 0.1 #1.0 does not work
 
-    h1 , h1A ,_h1B = CBF1_loss(agent,target)
-    h2 , h2A , h2B = CBF2_loss(agent,target)
-    h3 , h3A , h3B = CBF3_loss(agent,target)
+    h1,dh1_dxA,dh1_dxB = agent.CBF1_loss(agent,target)
+    h2,dh2_dxA,dh2_dxB = agent.CBF2_loss(agent,target)
+    h3,dh3_dxA,dh3_dxB = agent.CBF3_loss(agent,target)
 
     U = np.array([u,w]).reshape(-1,1)
-    h1_ = h1 @ U + h1 + alpha * h1
-    h2_ = h2 @ U + h2 + alpha * h2
-    h3_ = h3 @ U + h3 + alpha * h3
+    
+    h1_ = dh1_dxA @ agent.xdot(U) + dh1_dxB @ target.xdot(target.U) + alpha*h1
+    h2_ = dh2_dxA @ agent.xdot(U) + dh2_dxB @ target.xdot(target.U) + alpha*h2
+    h3_ = dh3_dxA @ agent.xdot(U) + dh3_dxB @ target.xdot(target.U) + alpha*h3
 
     if h1_ > 0 and h2_ > 0 and h3_ > 0:
         return True, h1_, h2_, h3_
     else:
         return False, h1_, h2_, h3_
 
-def CBF1_loss(agent,target):
-    h = max_D**2 - np.linalg.norm( agent.X[0:2,0] - target.X[:,0] )**2
-    h_dot_B = 2*( agent.X[0:2,0] - target.X[:,0] ) @ target.V  - 2*( agent.X[0:2,0] - target.X[:,0] ) @ ( agent.f[0:2,:]  ) - 2*( agent.X[0:2,0] - target.X[:,0] ) @ ( agent.f_corrected[0:2,:]  )
-    h_dot_A = - 2*( agent.X[0:2,0] - target.X[:,0] ) @ ( agent.g[0:2,:]  ) - 2*( agent.X[0:2,0] - target.X[:,0] ) @ ( agent.g_corrected[0:2,:]  )
-    
-    return h, h_dot_A, h_dot_B
-
-def CBF2_loss(agent,target):
-    h = np.linalg.norm( agent.X[0:2,0] - target.X[:,0] )**2 - min_D**2
-
-    h_dot_B = - 2*( agent.X[0:2,0] - target.X[:,0] ) @ target.V  + 2*( agent.X[0:2,0] - target.X[:,0] ) @ ( agent.f[0:2,:]  ) + 2*( agent.X[0:2,0] - target.X[:,0] ) @ ( agent.f_corrected[0:2,:]  )
-    h_dot_A =   2*( agent.X[0:2,0] - target.X[:,0] ) @ ( agent.g[0:2,:]  ) + 2*( agent.X[0:2,0] - target.X[:,0] ) @ ( agent.g_corrected[0:2,:]  )
-    return h, h_dot_A, h_dot_B
-
-
-def CBF3_loss(agent,target):
-    theta = agent.X[2,0]
-    # Direction Vector
-    bearing_vector = np.array([np.cos(theta),np.sin(theta)]) @ (target.X[:,0] - agent.X[0:2,0])/np.linalg.norm(target.X[:,0] - agent.X[0:2,0])
-    h = bearing_vector - np.cos(FoV/2)
-
-    dir_vector = np.array([np.cos(theta),np.sin(theta)])
-    
-    p_transpose = np.array([target.X[0,0],target.X[1,0]]) - np.array([agent.X[0,0],agent.X[1,0]])
-    p = p_transpose.reshape(-1,1)
-    factor = dir_vector/np.linalg.norm(agent.X[0:2]-target.X[:,0]) - ( (dir_vector @ p) * p_transpose )/2/np.linalg.norm(agent.X[0:2,0]-target.X[:,0])/(np.linalg.norm(agent.X[0:2,0]-target.X[:,0])**2)
-
-    factor_2 = ( (target.X[:,0] - agent.X[0:2,0])/np.linalg.norm(target.X[:,0] - agent.X[0:2,0]) @ np.array([ [-np.sin(theta)],[np.cos(theta)] ]) )
-    h_dot_B = factor @ target.V.reshape(-1,1) - factor @ agent.f[0:2,:] - factor @ agent.f_corrected[0:2,:] + factor_2 * agent.f[2,:] + factor_2 * agent.f_corrected[2,:]
-    h_dot_A = -factor @ agent.g[0:2,:] - factor @ agent.g_corrected[0:2,:] + factor_2 * agent.g[2,:] + factor_2 * agent.g_corrected[2,:]
-    return h, h_dot_A, h_dot_B
-
-def CLF_loss(agent,target):
-    
-    avg_D = (min_D + max_D)/2.0
-    V = (np.linalg.norm( agent.X[0:2,0] - target.X[:,0] ) - avg_D)**2
-
-    # V_dot = A*U + B
-    factor = (np.linalg.norm( agent.X[0:2,0] - target.X[:,0] ) - avg_D)/np.linalg.norm( agent.X[0:2,0] - target.X[:,0] ) * 2 * ( np.array([ agent.X[0,0], agent.X[1,0] ]) - np.array([target.X[0,0],target.X[1,0]]) )
-    V_dot_B = factor @ agent.f[0:2,:] + factor @ agent.f_corrected[0:2,:]
-    V_dot_A = factor @ agent.g[0:2,:] + factor @ agent.g_corrected[0:2,:]
-
-    return V, V_dot_A, V_dot_B
-
-def nominal_controller_old(agent,target):
-    #simple controller for now
-
-    #Define gamma for the Lyapunov function
-    k_omega = 2.5
-    k_v = 0.5
-
-    theta_d = np.arctan2(target.X[:,0][1]-agent.X[1,0],target.X[:,0][0]-agent.X[0,0])
-    error_theta = wrap_angle( theta_d - agent.X[2,0] )
-    omega = k_omega*error_theta
-
-    distance = max(np.linalg.norm( agent.X[0:2,0]-target.X[:,0] ) - 0.3,0)
-
-    v = k_v*( distance )*np.cos( error_theta )**2 
-    return v, omega 
-
-def nominal_controller_exact(agent,target):
-    #simple controller for now
-
-    #Define gamma for the Lyapunov function
-    k_omega = 2.5
-    k_v = 0.5
-
-    theta_d = np.arctan2(target.X[:,0][1]-agent.X[1,0],target.X[:,0][0]-agent.X[0,0])
-    error_theta = wrap_angle( theta_d - agent.X[2,0] )
-    omega = k_omega*error_theta - agent.d3
-
-    distance = max(np.linalg.norm( agent.X[0:2,0]-target.X[:,0] ) - 0.3,0)
-
-    v = k_v*( distance )*np.cos( error_theta )**2 - (agent.d1 + agent.d2)/2
-    return v, omega 
-
-def nominal_controller(agent,target):
-    #simple controller for now
-
-    #Define gamma for the Lyapunov function
-    k_omega = 2.5
-    k_v = 0.5
-
-    theta_d = np.arctan2(target.X[:,0][1]-agent.X[1,0],target.X[:,0][0]-agent.X[0,0])
-    error_theta = wrap_angle( theta_d - agent.X[2,0] )
-
-    if (np.abs(1 + agent.g_corrected[2,1])>0.01):
-        omega = k_omega*error_theta/(1 + agent.g_corrected[2,1]) - agent.f_corrected[2,0]
-    else:
-        omega = k_omega*error_theta - agent.f_corrected[2,0]
-
-    distance = max(np.linalg.norm( agent.X[0:2,0]-target.X[:,0] ) - 0.3,0)
-
-    v = k_v*( distance )*np.cos( error_theta )**2 - (agent.f_corrected[0,0] + agent.f_corrected[1,0])/2
-    return v, omega #np.array([v,omega])
 
 def CBF_CLF_QP(agent,target):
 
-    u, w = nominal_controller(agent,target)
+    u, w = agent.nominal_controller(target)
     U = np.array([u,w]).reshape(-1,1)
 
     alpha = 0.1 #1.0 does not work
     k = 0.1
 
-    h1,h1A,h1B = CBF1_loss(agent,target)
-    h2,h2A,h2B = CBF2_loss(agent,target)
-    h3,h3A,h3B = CBF3_loss(agent,target)
+    h1,dh1_dxA,dh1_dxB = agent.CBF1_loss(target)
+    h2,dh2_dxA,dh2_dxB = agent.CBF2_loss(target)
+    h3,dh3_dxA,dh3_dxB = agent.CBF3_loss(target)
 
-    V,VA,VB = CLF_loss(agent,target)
+    V,dV_dxA,dV_dxB = agent.CLF_loss(target)
 
-    G = np.array([ [ VA[0] , VA[1], -1.0   ],
-                   [ -h1A[0], -h1A[1], 0.0 ] ,
-                   [ -h2A[0], -h2A[1], 0.0 ] ,
-                   [ -h3A[0], -h3A[1], 0.0 ]    
-                    ])
+    x = cp.Variable((2,1))
 
-    h = np.array([-VB - k*V ,
-                 h1B + alpha*h1  ,
-                 h2B + alpha*h2  ,
-                 h3B + alpha*h3 ]).reshape(-1,1)
 
-    #Convert numpy arrays to cvx matrices to set up QP
-    G = matrix(G,tc='d')
-    h = matrix(h,tc='d')
+    objective = cp.Minimize(cp.sum_squares(x-U))
+    
+    # CLF constraint
+    const = [dV_dxA @ agent.xdot(x) + dV_dxB @ target.xdot(target.U) <= -k*V]
 
-    # Cost matrices
-    P = matrix(np.diag([2., 2., 6.]), tc='d')
-    q = matrix(np.array([ -2*u, -2*w, 0 ]))
+    # CBF1 constraint
+    const += [dh1_dxA @ agent.xdot(x) + dh1_dxB @ target.xdot(target.U) >= -alpha*h1]
+    const += [dh2_dxA @ agent.xdot(x) + dh2_dxB @ target.xdot(target.U) >= -alpha*h2]
+    const += [dh2_dxA @ agent.xdot(x) + dh2_dxB @ target.xdot(target.U) >= -alpha*h3]
 
-    solvers.options['show_progress'] = False
-    sol = solvers.qp(P, q, G, h)
-    u_bar = sol['x']
+    problem = cp.Problem(objective,const)
+    result = problem.solve()
 
-    if sol['status'] != 'optimal':
+    if problem.status == 'optimal':
+        return True, x.value[0,0], x.value[1,0]
+    else:
+        print("SBF QP not solvable")
         return False, 0, 0
 
-    return True, u_bar[0], u_bar[1]
+
+
+    # G = np.array([ [ VA[0] , VA[1], -1.0   ],
+    #                [ -h1A[0], -h1A[1], 0.0 ] ,
+    #                [ -h2A[0], -h2A[1], 0.0 ] ,
+    #                [ -h3A[0], -h3A[1], 0.0 ]    
+    #                 ])
+
+    # h = np.array([-VB - k*V ,
+    #              h1B + alpha*h1  ,
+    #              h2B + alpha*h2  ,
+    #              h3B + alpha*h3 ]).reshape(-1,1)
+
+    # #Convert numpy arrays to cvx matrices to set up QP
+    # G = matrix(G,tc='d')
+    # h = matrix(h,tc='d')
+
+    # # Cost matrices
+    # P = matrix(np.diag([2., 2., 6.]), tc='d')
+    # q = matrix(np.array([ -2*u, -2*w, 0 ]))
+
+    # solvers.options['show_progress'] = False
+    # sol = solvers.qp(P, q, G, h)
+    # u_bar = sol['x']
+
+    # if sol['status'] != 'optimal':
+    #     return False, 0, 0
+
+    #return True, u_bar[0], u_bar[1]
 
 
 
@@ -802,7 +611,8 @@ def eval_policy_sim(agent_TD3, seed, eval_episodes=10):
 
     for _ in range(eval_episodes):
         # state, done = eval_env.reset(), False
-        agentF = follower(np.array([0,0.2,0]),dt)
+        # agentF = follower(np.array([0,0.2,0]),dt)
+        agentF = Unicycle2D(np.array([0,0.2,0]),dt,3,FoV,max_D,min_D)
         agentT = target(np.array([1,0]),dt)
         done = False
 
@@ -913,8 +723,8 @@ def train(args):
         episodic_reward = 0
         timestep = 0
 
-        agentF = follower(np.array([0,0.2,0]),dt)
-        agentT = target(np.array([1,0]),dt)
+        agentF = Unicycle2D(np.array([0,0.2,0]),dt,3,FoV,max_D,min_D)
+        agentT = SingleIntegrator(np.array([1,0]),dt)
 
         T_ns_prev = agentT.X
         F_ns_prev = agentF.X
@@ -1104,9 +914,9 @@ def train(args):
             # next_state, reward, done, info = env.step(action)
 
             # h from previous state:
-            h1_prev ,_ ,_ = CBF1_loss(agentF,agentT)
-            h2_prev ,_ ,_ = CBF2_loss(agentF,agentT)
-            h3_prev ,_ ,_ = CBF3_loss(agentF,agentT)
+            h1_prev ,_ ,_ = agentF.CBF1_loss(agentT)
+            h2_prev ,_ ,_ = agentF.CBF2_loss(agentT)
+            h3_prev ,_ ,_ = agentF.CBF3_loss(agentT)
 
             FX_prev = agentF.X  
 
@@ -1147,11 +957,11 @@ def train(args):
             # maximize reward
             reward = compute_reward_model_error( ( d1*10.0 - d1_obs*10.0 ), ( d2*10.0 - d2_obs*10.0 ), ( d3*10.0 - d3_obs*10.0 ) )
             # print("reward: ",reward)
-            h1_new , h1A ,_h1B = CBF1_loss(agentF,agentT)
+            h1_new , h1A ,_h1B = agentF.CBF1_loss(agentT)
             h1p.append(h1_new)
-            h2_new ,h2A , h2B = CBF2_loss(agentF,agentT)
+            h2_new ,h2A , h2B = agentF.CBF2_loss(agentT)
             h2p.append(h2_new)
-            h3_new , h3A , h3B = CBF3_loss(agentF,agentT)
+            h3_new , h3A , h3B = agentF.CBF3_loss(agentT)
             h3p.append(h3_new)
 
             # h1_dot_true = (h1_new - h1_prev)/dt
