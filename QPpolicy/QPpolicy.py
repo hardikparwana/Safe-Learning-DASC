@@ -103,8 +103,8 @@ class Actor:
 
         x = cp.Variable((2,1))
         delta = cp.Variable(1)
-        # objective = cp.Minimize(cp.sum_squares(x-U) + 100*delta)
-        objective = cp.Minimize(cp.sum_squares(x-U) + delta)
+        objective = cp.Minimize(cp.sum_squares(x-U) + 100*delta)
+        # objective = cp.Minimize(cp.sum_squares(x-U) + delta)
         # objective = cp.Minimize(10*cp.square(x[0,0]-U[0,0]) + cp.square(x[1,0]-U[1,0]) + 100*delta)
 
         alpha = cp.Parameter(value=self.alpha_nominal)
@@ -145,6 +145,7 @@ class Actor:
         problem.solve(verbose=False)
         # print(problem.status)
         # print("solve value",x.value)
+        print(f"V:{V}, input:{x.value[0]}, {x.value[1]}, V_dot:{dV_dxA @ agent.xdot(x.value) + dV_dxB @ target.xdot(target.U)}")
         # print(f"Lgh:{ dh3_dxA @ (agent.g + agent.g_corrected) }, solve value:{x.value[0]}, {x.value[1]}")
         # print(f"alpha:{alpha.value}, h3:{h3}, h3_dotA:{dh3_dxA @ agent.xdot(x.value)}, h3_dotB:{dh3_dxB @ target.xdot(target.U)}, h3_dot:{dh3_dxA @ agent.xdot(x.value) + dh3_dxB @ target.xdot(target.U)}, h3_dot+ alpha*h:{dh3_dxA @ agent.xdot(x.value) + dh3_dxB @ target.xdot(target.U) + alpha.value*h3}, dh3_dxA:{dh3_dxA}")
         # print("slack",delta.value)
@@ -268,7 +269,7 @@ class policy_learning_agent:
             self.actor.alpha_nominal = 0
         if self.actor.k_nominal < 0:
             self.actor.k_nominal = 0
-        print(f"policy_gradient:{policy_gradient}, alpha_nominal:{self.actor.alpha_nominal}, k_nominal:{self.actor.k_nominal}")
+        # print(f"policy_gradient:{policy_gradient}, alpha_nominal:{self.actor.alpha_nominal}, k_nominal:{self.actor.k_nominal}")
 
     def policy(self,follower,target):
         solved, U, param_grad, delta = self.actor.policy(follower,target)
