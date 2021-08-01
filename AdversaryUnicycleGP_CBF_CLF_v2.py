@@ -98,7 +98,7 @@ class follower:
         triangle_hy = [x[1] , P1[1], P2[1], x[1] ]
         
         triangle_v = [ x,P1,P2,x ]  
-        # print("triangle_v",triangle_v)
+        print("triangle_v",triangle_v)
 
         lines.set_data(triangle_hx,triangle_hy)
         areas.set_xy(triangle_v)
@@ -506,7 +506,7 @@ for k in range(0,60):
     h ,_ ,_ = CBF3_loss(agentF,agentT)
     h3p.append(h)
 
-    # print("d1",d1)
+    print("d1",d1)
     # print("d2",d2)
 
     FX_prev = agentF.X    
@@ -545,11 +545,11 @@ for k in range(0,60):
     update_GP_dynamics(GP_list,Xgp, obs_d2, 1, agentF.X[2,0])
     update_GP_dynamics(GP_list,Xgp, obs_d3, 2, agentF.X[2,0])
 
-    # lines, areas, bodyF = agentF.render(lines,areas,bodyF)
-    # bodyT = agentT.render(bodyT)
+    lines, areas, bodyF = agentF.render(lines,areas,bodyF)
+    bodyT = agentT.render(bodyT)
     
-    # fig.canvas.draw()
-    # fig.canvas.flush_events()
+    fig.canvas.draw()
+    fig.canvas.flush_events()
 
     t = t + dt
 

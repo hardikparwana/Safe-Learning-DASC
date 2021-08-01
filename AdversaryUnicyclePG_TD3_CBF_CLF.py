@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 import os
 import time
 
+torch.autograd.set_detect_anomaly(True)
 
 class follower:
     

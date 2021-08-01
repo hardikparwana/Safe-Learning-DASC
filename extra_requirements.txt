@@ -1,0 +1,18 @@
+1. matplotlib does not plot
+_main__:1: UserWarning: Matplotlib is currently using agg, which is a non-GUI backend, so cannot show the figure.
+ Solution:
+sudo apt-get install python3.6-tk
+
+2. gym does not contain box2d
+AttributeError: module 'gym.envs.box2d' has no attribute 'BipedalWalker'
+
+Solution:
+pip install box2d-py
+
+3. cvxpy install fails because it cannot find Python.h
+Solution: sudo apt-get install python3.6-dev
+
+4. torch error
+RuntimeError: one of the variables needed for gradient computation has been modified by an inplace operation: [torch.cuda.FloatTensor [256, 3]], which is output 0 of TBackward, is at version 2; expected version 1 instead. Hint: enable anomaly detection to find the operation that failed to compute its gradient, with torch.autograd.set_detect_anomaly(True).
+
+Solution: related to torch version. downgrade to version 1.5.0 or lower. but doesn't seem to work on laptop. probably does not support rtx 3000 series. Need to modify code for 3000 series. it needs cuda 11.x. but torch 1.5.0 uses 10.x

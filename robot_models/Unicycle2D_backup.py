@@ -1,6 +1,6 @@
 import numpy as np
 
-class Unicycle2D:
+class Unicycle2D_backup:
     
     def __init__(self,X0,dt,fov_length,fov_angle,max_D,min_D):
         X0 = X0.reshape(-1,1)
@@ -179,21 +179,20 @@ class Unicycle2D:
         factor = dir_vector/np.linalg.norm(self.X[0:2]-target.X[:,0]) - ( (dir_vector @ p) * p_transpose )/2/np.linalg.norm(self.X[0:2,0]-target.X[:,0])/(np.linalg.norm(self.X[0:2,0]-target.X[:,0])**2)
         factor_2 = ( (target.X[:,0] - self.X[0:2,0])/np.linalg.norm(target.X[:,0] - self.X[0:2,0]) @ np.array([ [-np.sin(theta)],[np.cos(theta)] ]) )
 
-        # x = X_L - X_F
-        dh_dx = dir_vector/np.linalg.norm(p,2) - ( (dir_vector @ p) * p_transpose )/np.linalg.norm(p)**3       
-        dh_dTheta = np.array([ -np.sin(theta),np.cos(theta) ]) @ p/np.linalg.norm(p)
+        # # x = X_L - X_F
+        # dh_dx = dir_vector/np.linalg.norm(p,2) - ( (dir_vector @ p) * p_transpose )/np.linalg.norm(p)**3       
+        # dh_dTheta = np.array([ -np.sin(theta),np.cos(theta) ]) @ p/np.linalg.norm(p)
 
-        dh_dx_agent = np.append(-dh_dx, dh_dTheta  )
-        dh_dx_target = dh_dx
+        # dh_dx_agent = np.append(-dh_dx, dh_dTheta  )
+        # dh_dx_target = dh_dx
         # print(f"dh_dx:{dh_dx}, dh_dtheta:{dh_dTheta}, dh_dAgent:{dh_dx_agent}")
 
-        # dh_dx_agent = np.append(-factor + factor_2, dh_dTheta  )
-        # dh_dx_target = factor
-        # vect = (target.X[:,0] - self.X[0:2,0])/np.linalg.norm(target.X[:,0] - self.X[0:2,0])
+        dh_dx_target = factor
+        vect = (target.X[:,0] - self.X[0:2,0])/np.linalg.norm(target.X[:,0] - self.X[0:2,0])
         # print("vect",vect)
         # dh_dTheta = np.array([-np.sin(theta),np.cos(theta)]) @ (target.X[:,0] - self.X[0:2,0])/np.linalg.norm(target.X[:,0] - self.X[0:2,0])
-        # dh_dx_agent = np.append(-factor + factor_2, dh_dTheta  )
-        # dh_dx_target = factor
+        dh_dx_agent = np.append(-factor + factor_2, 0  )
+        dh_dx_target = factor
 
         # h_dot_B = factor @ target.V.reshape(-1,1) - factor @ self.f[0:2,:] - factor @ self.f_corrected[0:2,:] + factor_2 * self.f[2,:] + factor_2 * self.f_corrected[2,:]
         # h_dot_A = -factor @ self.g[0:2,:] - factor @ self.g_corrected[0:2,:] + factor_2 * self.g[2,:] + factor_2 * self.g_corrected[2,:]
@@ -250,7 +249,7 @@ class Unicycle2D:
         #simple controller for now: considers estimated disturbance
 
         #Define gamma for the Lyapunov function
-        k_omega = 0.0#2.5
+        k_omega = 2.5
         k_v = 0.5
 
         theta_d = np.arctan2(target.X[:,0][1]-self.X[1,0],target.X[:,0][0]-self.X[0,0])
@@ -287,10 +286,10 @@ class Unicycle2D:
         # if h1<0 or h2<0 or h3<0:
         #     return -1
         if barrier < 0:
-            return barrier, 0, h1, h2, h3
+            return barrier, 0
             # return -1, 0
         
-        return barrier, dh_dx_list[self.h_index], h1, h2, h3
+        return barrier, dh_dx_list[self.h_index]
 
     def compute_reward_sim(self,Fx,Tx):
         if self.h_index == 0:

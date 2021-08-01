@@ -12,15 +12,16 @@ from cvxopt import solvers
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, WhiteKernel, ConstantKernel as C
 
-
-
-
 from sklearn.utils.testing import ignore_warnings
 from sklearn.exceptions import ConvergenceWarning
 # from sklearn.exceptions import UserWarning
 
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
+
+# for Ctrl + C to close all figures too
+import signal
+signal.signal(signal.SIGINT, signal.SIG_DFL)
 
 FoV = 60*np.pi/180
 max_D = 3
@@ -68,7 +69,7 @@ class follower:
         # print(f"step: X_next:{self.X}")
         # print("X",self.X)
     
-        self.X[2] = wrap_angle(self.X[2])
+        self.X[2,0] = wrap_angle(self.X[2,0])
         
         return self.X
 
@@ -164,8 +165,8 @@ def build_GP_model(N):
     for i in range(N):
         kern = 3.0 * RBF(length_scale=2, length_scale_bounds=(1e-2, 1e3)) + WhiteKernel(noise_level=0.1, noise_level_bounds=(1e-10, 1e+1))
         #kern = C(1.0, (1e-3, 1e3)) * RBF(10, (1e-2, 1e2))
-        # gp = GaussianProcessRegressor(kernel=kern, alpha = noise, n_restarts_optimizer=10)
-        gp = GaussianProcessRegressor(kernel=kern, alpha = noise, optimizer=None)
+        gp = GaussianProcessRegressor(kernel=kern, alpha = noise, n_restarts_optimizer=3)
+        # gp = GaussianProcessRegressor(kernel=kern, alpha = noise, optimizer=None)
         GP_list.append(gp)
     return GP_list
 
@@ -176,14 +177,19 @@ def update_GP_dynamics(GP_list,X,Y, index, curr_X):
     GP_list[index].fit(np.asarray(X).reshape(-1,1),np.asarray(Y).reshape(-1,1))
 
 def update_GP_dynamics_buffer(GP_list,X,Y, index, X_full, Y_full):
-    GP_list[index].fit(np.asarray(X).reshape(-1,1),np.asarray(Y).reshape(-1,1))
 
+    GP_list[index].fit(np.asarray(X).reshape(-1,1),np.asarray(Y).reshape(-1,1))
     likelihood, gradient = GP_list[index].log_marginal_likelihood(theta=GP_list[index].kernel_.theta,eval_gradient=True)
 
     # print(f"theta:{GP_list[index].kernel_.theta}, gradient:{gradient}, params:{GP_list[index].get_params()}")
-    beta = 0.1
+    beta = 0.05
     theta_prev = np.exp(GP_list[index].kernel_.theta)
     theta = np.exp(GP_list[index].kernel_.theta) + beta*gradient
+    if theta[1]<0:
+        theta[1] = 0.01
+    if theta[2]<0:
+        theta[2] = 0.01
+    # print("theta",theta)
     kern = theta[0] * RBF(length_scale=theta[1], length_scale_bounds=(1e-2, 1e3)) + WhiteKernel(noise_level=theta[2], noise_level_bounds=(1e-10, 1e+1))
     noise = 0.01
     GP_list[index] = GaussianProcessRegressor(kernel=kern, alpha = noise, optimizer=None)
@@ -191,14 +197,16 @@ def update_GP_dynamics_buffer(GP_list,X,Y, index, X_full, Y_full):
     # print(f"xfull:{X_full}, yfull:{Y_full}")
     # print(f"theta:{theta}, nanx:{np.isnan(np.asarray(X_full)).any()}, nany:{np.isnan(np.asarray(Y_full)).any()}  ")
     
+    # GP_list[index].fit(np.asarray(X_full).reshape(-1,1),np.asarray(Y_full).reshape(-1,1))
     try:
         GP_list[index].fit(np.asarray(X_full).reshape(-1,1),np.asarray(Y_full).reshape(-1,1))
+        # print("****************** SUCCESS ********************")
     except:
         kern = theta_prev[0] * RBF(length_scale=theta_prev[1], length_scale_bounds=(1e-2, 1e3)) + WhiteKernel(noise_level=theta_prev[2], noise_level_bounds=(1e-10, 1e+1))
         noise = 0.01
         GP_list[index] = GaussianProcessRegressor(kernel=kern, alpha = noise, optimizer=None)
         GP_list[index].fit(np.asarray(X_full).reshape(-1,1),np.asarray(Y_full).reshape(-1,1))
-        print("****************** ERROR ********************")
+        print("****************** ERROR using previous parameter: NO update done ********************")
     # print("FITTED")
     # GP_list[index].set_params(theta)
 
@@ -227,8 +235,12 @@ def test_GP_dynamics(GP_list,X,index):
     for i in X:
         y_pred, sigma_pred = GP_list[index].predict(np.array([i]).reshape(-1, 1),return_std=True)
         # print(f"y:{y_pred[0][0]}, y_pred: {sigma_pred[0]}")
-        Y.append(y_pred[0][0])
-        Y_std.append(sigma_pred[0])
+        try: 
+            Y.append(y_pred[0][0])
+            Y_std.append(sigma_pred[0])
+        except:
+            Y.append(y_pred[0])
+            Y_std.append(sigma_pred[0])
     return np.asarray(Y), np.asarray(Y_std)
 
 def compute_CLF(X,Xd):
@@ -504,7 +516,9 @@ replay_buffer_d3 = []#deque(maxlen = batch_size)
 
 first_value =  True
 
-for k in range(0,400):
+start_time_sim = time.time()
+
+for k in range(0,500):
 
     if len(replay_buffer_x)==batch_size:
         replay_buffer_x = []#deque(maxlen = batch_size)
@@ -592,7 +606,8 @@ for k in range(0,400):
 
     # update_GP_dynamics(GP_list,N,np.array([FX_prev[2],FX_prev[2],FX_prev[2]] ), np.array([d1_obs,d2_obs,d3_obs]))
     
-    if 1:#len(replay_buffer_x)==batch_size:
+    if len(replay_buffer_x)==batch_size:
+    
         update_GP_dynamics(GP_list,Xgp, obs_d1, 0, agentF.X[2,0])
         update_GP_dynamics(GP_list,Xgp, obs_d2, 1, agentF.X[2,0])
         update_GP_dynamics(GP_list,Xgp, obs_d3, 2, agentF.X[2,0])
@@ -608,6 +623,8 @@ for k in range(0,400):
 
     t = t + dt
 
+print("simulation time period",t)
+print("time taken", time.time()-start_time_sim)
 
 
 # print(len(pred_d1))
@@ -624,9 +641,11 @@ d, d_std = test_GP_dynamics( GP_list,theta, 0  )
 d_true = true_d(theta,0)
 plt.plot(theta,d_true,'r',label='True Dyanmics')
 plt.plot(theta,d,label='Estimated Dynamics')
+plt.xlabel('state')
 plt.legend()
 plt.fill_between(theta, d - d_std, d + d_std, alpha=0.2, color = 'm')
-plt.title("Unknown Dynamics Estimation")
+plt.title("Supervised Learning Regression: Exact Fit")
+# plt.title("Unknown Dynamics Estimation")
 
 # plt.figure()
 # theta = np.linspace(-1,1,100)
