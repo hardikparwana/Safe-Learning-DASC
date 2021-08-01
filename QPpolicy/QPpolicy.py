@@ -137,7 +137,7 @@ class Actor:
             return False, np.array([0,0]).reshape(-1,1), 0, 0
 
         ### Gradient computation
-        solution.sum().backward()
+        # solution.sum().backward()
 
         e1 = torch.tensor(np.array([1.0,0]), dtype=torch.float)
         # print("e1",e1)
@@ -145,7 +145,7 @@ class Actor:
         problem.solve(verbose=False)
         # print(problem.status)
         # print("solve value",x.value)
-        print(f"V:{V}, input:{x.value[0]}, {x.value[1]}, V_dot:{dV_dxA @ agent.xdot(x.value) + dV_dxB @ target.xdot(target.U)}")
+        print(f"V:{V}, input:{x.value[0]}, {x.value[1]}, V_dot:{dV_dxA @ agent.xdot(solution.detach().numpy().reshape(-1,1)) + dV_dxB @ target.xdot(target.U)}")
         # print(f"Lgh:{ dh3_dxA @ (agent.g + agent.g_corrected) }, solve value:{x.value[0]}, {x.value[1]}")
         # print(f"alpha:{alpha.value}, h3:{h3}, h3_dotA:{dh3_dxA @ agent.xdot(x.value)}, h3_dotB:{dh3_dxB @ target.xdot(target.U)}, h3_dot:{dh3_dxA @ agent.xdot(x.value) + dh3_dxB @ target.xdot(target.U)}, h3_dot+ alpha*h:{dh3_dxA @ agent.xdot(x.value) + dh3_dxB @ target.xdot(target.U) + alpha.value*h3}, dh3_dxA:{dh3_dxA}")
         # print("slack",delta.value)
@@ -565,7 +565,7 @@ Alphas = [0.5] #0.15
 Ks = [20] #0.1
 Trains = [True, False]
 Betas = [-0.2, -0.05, -0.03, 0, 0.03, 0.05, 0.2]
-Betas = [0.05]
+Betas = [0.2]
 
 reward_episodes = []
 reward_horizons = []
