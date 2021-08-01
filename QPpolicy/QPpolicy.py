@@ -578,11 +578,11 @@ parser.add_argument('--movie', type=float, default=True, metavar='G',help='CLF p
 parser.add_argument('--movie_name', default="alpha_15_training.mp4")
 args = parser.parse_args("")
 
-Alphas = [0.5] #0.15 #0.115
+Alphas = [0.113] #0.15 #0.115
 Ks = [2.0] #0.1 #2.0
 Trains = [True, False]
-Betas = [-0.2, -0.05, -0.03, 0, 0.03, 0.05, 0.2]
-# Betas = [0.1]
+# Betas = [-0.2, -0.05, -0.03, 0, 0.03, 0.05, 0.2]
+Betas = [-0.2]
 
 reward_episodes = []
 reward_horizons = []
@@ -609,7 +609,7 @@ for Alpha in Alphas:
             args.alpha = Alpha
             args.k = K
             args.lr_actor = Beta
-            args.train = True
+            args.train = False
 
             episode_reward, moving_reward, alphas, ks, t_plot, deltas, h1s, h2s, h3s, TXs =  train(args)
             axis1[0,0].plot(t_plot,episode_reward,c = colors[index])
