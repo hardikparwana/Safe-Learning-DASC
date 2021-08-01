@@ -117,8 +117,8 @@ class Actor:
 
         epsilon = 0.9
         # CBF constraints
-        # const += [dh1_dxA @ agent.xdot(x) + dh1_dxB @ target.xdot(target.U) >= -alpha*h1 + 0.5]#np.linalg.norm(dh1_dxA @ (agent.g+ agent.g_corrected))/epsilon]
-        # const += [dh2_dxA @ agent.xdot(x) + dh2_dxB @ target.xdot(target.U) >= -alpha*h2 + 0.5]#np.linalg.norm(dh2_dxA @ (agent.g+ agent.g_corrected))/epsilon]
+        const += [dh1_dxA @ agent.xdot(x) + dh1_dxB @ target.xdot(target.U) >= -alpha*h1 + 0.5]#np.linalg.norm(dh1_dxA @ (agent.g+ agent.g_corrected))/epsilon]
+        const += [dh2_dxA @ agent.xdot(x) + dh2_dxB @ target.xdot(target.U) >= -alpha*h2 + 0.5]#np.linalg.norm(dh2_dxA @ (agent.g+ agent.g_corrected))/epsilon]
         const += [dh3_dxA @ agent.xdot(x) + dh3_dxB @ target.xdot(target.U) >= -alpha*h3]#np.linalg.norm(dh3_dxA @ (agent.g+ agent.g_corrected))/epsilon]
         # const += [alpha >= -20]
         problem = cp.Problem(objective,const)
@@ -128,10 +128,26 @@ class Actor:
         alpha_tch = torch.tensor(alpha.value, requires_grad=True, dtype=torch.float)
         k_tch = torch.tensor(k.value, requires_grad=True, dtype=torch.float)
 
+        # solver_args = {
+        #     'mode': 'lsqr',
+        #     'verbose': False,
+        #     'max_iters': 2,
+        #     'eps': 1e-6,
+        #     'use_indirect': False,
+        #     'gpu': False,
+        #     'n_jobs_forward': -1,
+        #     'n_jobs_backward': -1
+        # }
+
+        solver_args = {
+            'verbose': False,
+            'max_iters': 100000
+        }
+
         # Solve the QP
         #  result = problem.solve()
         try:
-            solution, = cvxpylayer(alpha_tch,k_tch)
+            solution, = cvxpylayer(alpha_tch,k_tch, solver_args=solver_args)
         except:
             print("SBF QP not solvable")
             return False, np.array([0,0]).reshape(-1,1), 0, 0
@@ -142,10 +158,11 @@ class Actor:
         e1 = torch.tensor(np.array([1.0,0]), dtype=torch.float)
         # print("e1",e1)
         # print("solution",solution)
-        problem.solve(verbose=False)
+        # problem.solve(verbose=False)
         # print(problem.status)
         # print("solve value",x.value)
-        print(f"V:{V}, input:{x.value[0]}, {x.value[1]}, V_dot:{dV_dxA @ agent.xdot(solution.detach().numpy().reshape(-1,1)) + dV_dxB @ target.xdot(target.U)}")
+        x_value = solution.detach().numpy()
+        print(f"V:{V}, input:{x_value[0]}, {x_value[1]}, V_dot:{dV_dxA @ agent.xdot(x_value.reshape(-1,1)) + dV_dxB @ target.xdot(target.U)}")
         # print(f"Lgh:{ dh3_dxA @ (agent.g + agent.g_corrected) }, solve value:{x.value[0]}, {x.value[1]}")
         # print(f"alpha:{alpha.value}, h3:{h3}, h3_dotA:{dh3_dxA @ agent.xdot(x.value)}, h3_dotB:{dh3_dxB @ target.xdot(target.U)}, h3_dot:{dh3_dxA @ agent.xdot(x.value) + dh3_dxB @ target.xdot(target.U)}, h3_dot+ alpha*h:{dh3_dxA @ agent.xdot(x.value) + dh3_dxB @ target.xdot(target.U) + alpha.value*h3}, dh3_dxA:{dh3_dxA}")
         # print("slack",delta.value)
@@ -548,12 +565,12 @@ parser.add_argument('--lr-critic', type=float, default=0.03, metavar='G',help='l
 parser.add_argument('--plot_freq', type=float, default=1, metavar='G',help='plotting frequency')
 parser.add_argument('--seed', type=int, default=123456, metavar='N',help='random seed (default: 123456)')
 parser.add_argument('--batch-size', type=int, default=10, metavar='N', help='batch size (default: 256)') #100
-parser.add_argument('--buffer-capacity', type=int, default=1, metavar='N', help='buffer_capacity')
+parser.add_argument('--buffer-capacity', type=int, default=10, metavar='N', help='buffer_capacity')
 parser.add_argument('--max-steps', type=int, default=300, metavar='N',help='maximum number of steps of each episode') #70
 parser.add_argument('--total-episodes', type=int, default=1, metavar='N',help='total training episodes') #1000
 parser.add_argument('--policy-freq', type=int, default=200, metavar='N',help='update frequency of target network ')
 parser.add_argument('--start-timestep', type=int, default=10000, metavar='N',help='number of steps using random policy')
-parser.add_argument('--horizon', type=int, default=1, metavar='N',help='RL time horizon')
+parser.add_argument('--horizon', type=int, default=3, metavar='N',help='RL time horizon')
 parser.add_argument('--alpha', type=float, default=0.15, metavar='G',help='CBF parameter')  #0.003
 parser.add_argument('--k', type=float, default=0.1, metavar='G',help='CLF parameter')  #0.003
 parser.add_argument('--train', type=float, default=True, metavar='G',help='CLF parameter')  #0.003
@@ -561,11 +578,11 @@ parser.add_argument('--movie', type=float, default=True, metavar='G',help='CLF p
 parser.add_argument('--movie_name', default="alpha_15_training.mp4")
 args = parser.parse_args("")
 
-Alphas = [0.5] #0.15
-Ks = [20] #0.1
+Alphas = [0.5] #0.15 #0.115
+Ks = [2.0] #0.1 #2.0
 Trains = [True, False]
 Betas = [-0.2, -0.05, -0.03, 0, 0.03, 0.05, 0.2]
-Betas = [0.2]
+# Betas = [0.1]
 
 reward_episodes = []
 reward_horizons = []
