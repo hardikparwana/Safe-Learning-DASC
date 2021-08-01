@@ -82,11 +82,14 @@ def predict_GP_dynamics(GP_list,N,X):
 class Actor:
     def __init__(self,alpha=0.1,k=0.1,umax=np.array([3,3]),umin=np.array([-3,-3])) :
         self.alpha_nominal = alpha #1.0 does not work
+        self.alpha1_nominal = alpha
+        self.alpha2_nominal = alpha
+        self.alpha3_nominal = alpha
         self.k_nominal = k
         self.max_action = umax
         self.min_action = umin
 
-    def policy(self,agent,target):
+    def policy_mono(self,agent,target):
         # s = time.time()
         # print(f"alpha:{self.alpha_nominal}, k:{self.k_nominal}")
         u, w = agent.nominal_controller(target)
@@ -117,9 +120,9 @@ class Actor:
 
         epsilon = 0.9
         # CBF constraints
-        const += [dh1_dxA @ agent.xdot(x) + dh1_dxB @ target.xdot(target.U) >= -alpha*h1 + 0.5]#np.linalg.norm(dh1_dxA @ (agent.g+ agent.g_corrected))/epsilon]
-        const += [dh2_dxA @ agent.xdot(x) + dh2_dxB @ target.xdot(target.U) >= -alpha*h2 + 0.5]#np.linalg.norm(dh2_dxA @ (agent.g+ agent.g_corrected))/epsilon]
-        const += [dh3_dxA @ agent.xdot(x) + dh3_dxB @ target.xdot(target.U) >= -alpha*h3]#np.linalg.norm(dh3_dxA @ (agent.g+ agent.g_corrected))/epsilon]
+        const += [dh1_dxA @ agent.xdot(x) + dh1_dxB @ target.xdot(target.U) >= -alpha*h1 + 0.2]#np.linalg.norm(dh1_dxA @ (agent.g+ agent.g_corrected))/epsilon]
+        const += [dh2_dxA @ agent.xdot(x) + dh2_dxB @ target.xdot(target.U) >= -alpha*h2 + 0.2]#np.linalg.norm(dh2_dxA @ (agent.g+ agent.g_corrected))/epsilon]
+        const += [dh3_dxA @ agent.xdot(x) + dh3_dxB @ target.xdot(target.U) >= -alpha*h3 + 0.2]#np.linalg.norm(dh3_dxA @ (agent.g+ agent.g_corrected))/epsilon]
         # const += [alpha >= -20]
         problem = cp.Problem(objective,const)
         assert problem.is_dpp()
@@ -141,7 +144,7 @@ class Actor:
 
         solver_args = {
             'verbose': False,
-            'max_iters': 100000
+            'max_iters': 1000000
         }
 
         # Solve the QP
@@ -162,7 +165,7 @@ class Actor:
         # print(problem.status)
         # print("solve value",x.value)
         x_value = solution.detach().numpy()
-        print(f"V:{V}, input:{x_value[0]}, {x_value[1]}, V_dot:{dV_dxA @ agent.xdot(x_value.reshape(-1,1)) + dV_dxB @ target.xdot(target.U)}")
+        # print(f"V:{V}, input:{x_value[0]}, {x_value[1]}, V_dot:{dV_dxA @ agent.xdot(x_value.reshape(-1,1)) + dV_dxB @ target.xdot(target.U)}")
         # print(f"Lgh:{ dh3_dxA @ (agent.g + agent.g_corrected) }, solve value:{x.value[0]}, {x.value[1]}")
         # print(f"alpha:{alpha.value}, h3:{h3}, h3_dotA:{dh3_dxA @ agent.xdot(x.value)}, h3_dotB:{dh3_dxB @ target.xdot(target.U)}, h3_dot:{dh3_dxA @ agent.xdot(x.value) + dh3_dxB @ target.xdot(target.U)}, h3_dot+ alpha*h:{dh3_dxA @ agent.xdot(x.value) + dh3_dxB @ target.xdot(target.U) + alpha.value*h3}, dh3_dxA:{dh3_dxA}")
         # print("slack",delta.value)
@@ -184,6 +187,127 @@ class Actor:
         u2_alpha = np.copy(alpha_tch.grad.numpy().reshape(1,-1)) - u1_alpha
         u2_k = np.copy(k_tch.grad.numpy().reshape(1,-1)) - u1_k
         u2_grad = np.append(  u2_alpha, u2_k , axis=1  )
+
+        u_grad = np.append(u1_grad, u2_grad, axis=0)
+        # print(u_grad)
+        # exit()
+        # print("time",time.time()-s)
+        # print(solution)
+        return True, solution.detach().numpy().reshape(-1,1), u_grad, delta.value
+        # return True, U, u_grad
+
+    def policy(self,agent,target):
+        # s = time.time()
+        # print(f"alpha:{self.alpha_nominal}, k:{self.k_nominal}")
+        u, w = agent.nominal_controller(target)
+        # U = np.array([u,w]).reshape(-1,1)
+        U = np.array([0,0]).reshape(-1,1)
+
+        h1,dh1_dxA,dh1_dxB = agent.CBF1_loss(target)
+        h2,dh2_dxA,dh2_dxB = agent.CBF2_loss(target)
+        h3,dh3_dxA,dh3_dxB = agent.CBF3_loss(target)
+
+        # print(f"h1:{h1}, h2:{h2}, h3:{h3}")
+
+        V,dV_dxA,dV_dxB = agent.CLF_loss(target)
+
+        x = cp.Variable((2,1))
+        delta = cp.Variable(1)
+        objective = cp.Minimize(cp.sum_squares(x-U) + 100*delta)
+        # objective = cp.Minimize(cp.sum_squares(x-U) + delta)
+        # objective = cp.Minimize(10*cp.square(x[0,0]-U[0,0]) + cp.square(x[1,0]-U[1,0]) + 100*delta)
+
+        alpha1 = cp.Parameter(value=self.alpha1_nominal)
+        alpha2 = cp.Parameter(value=self.alpha2_nominal)
+        alpha3 = cp.Parameter(value=self.alpha3_nominal)
+        k = cp.Parameter(value=self.k_nominal)
+        
+        # CLF constraint
+        const = [dV_dxA @ agent.xdot(x) + dV_dxB @ target.xdot(target.U) <= -k*V + delta]
+        # print("Lyapuniov function V",V)
+        const += [delta>=0]
+
+        epsilon = 0.9
+        # CBF constraints
+        const += [dh1_dxA @ agent.xdot(x) + dh1_dxB @ target.xdot(target.U) >= -alpha1*h1 ]#np.linalg.norm(dh1_dxA @ (agent.g+ agent.g_corrected))/epsilon]
+        const += [dh2_dxA @ agent.xdot(x) + dh2_dxB @ target.xdot(target.U) >= -alpha2*h2 ]#np.linalg.norm(dh2_dxA @ (agent.g+ agent.g_corrected))/epsilon]
+        const += [dh3_dxA @ agent.xdot(x) + dh3_dxB @ target.xdot(target.U) >= -alpha3*h3 ]#np.linalg.norm(dh3_dxA @ (agent.g+ agent.g_corrected))/epsilon]
+        # const += [alpha >= -20]
+        problem = cp.Problem(objective,const)
+        assert problem.is_dpp()
+
+        cvxpylayer = CvxpyLayer(problem, parameters=[alpha1, alpha2, alpha3, k], variables=[x])
+        alpha1_tch = torch.tensor(alpha1.value, requires_grad=True, dtype=torch.float)
+        alpha2_tch = torch.tensor(alpha2.value, requires_grad=True, dtype=torch.float)
+        alpha3_tch = torch.tensor(alpha3.value, requires_grad=True, dtype=torch.float)
+        k_tch = torch.tensor(k.value, requires_grad=True, dtype=torch.float)
+
+        # solver_args = {
+        #     'mode': 'lsqr',
+        #     'verbose': False,
+        #     'max_iters': 2,
+        #     'eps': 1e-6,
+        #     'use_indirect': False,
+        #     'gpu': False,
+        #     'n_jobs_forward': -1,
+        #     'n_jobs_backward': -1
+        # }
+
+        solver_args = {
+            'verbose': False,
+            'max_iters': 1000000
+        }
+
+        # Solve the QP
+        #  result = problem.solve()
+        try:
+            solution, = cvxpylayer(alpha1_tch, alpha2_tch, alpha3_tch, k_tch, solver_args=solver_args)
+        except:
+            print("SBF QP not solvable")
+            return False, np.array([0,0]).reshape(-1,1), 0, 0
+
+        ### Gradient computation
+        # solution.sum().backward()
+
+        e1 = torch.tensor(np.array([1.0,0]), dtype=torch.float)
+        # print("e1",e1)
+        # print("solution",solution)
+        # problem.solve(verbose=False)
+        # print(problem.status)
+        # print("solve value",x.value)
+        x_value = solution.detach().numpy()
+        # print(f"V:{V}, input:{x_value[0]}, {x_value[1]}, V_dot:{dV_dxA @ agent.xdot(x_value.reshape(-1,1)) + dV_dxB @ target.xdot(target.U)}")
+        # print(f"Lgh:{ dh3_dxA @ (agent.g + agent.g_corrected) }, solve value:{x.value[0]}, {x.value[1]}")
+        # print(f"alpha:{alpha3.value}, h3:{h3}, h3_dotA:{dh3_dxA @ agent.xdot(x_value)}, h3_dotB:{dh3_dxB @ target.xdot(target.U)}, h3_dot:{dh3_dxA @ agent.xdot(x_value) + dh3_dxB @ target.xdot(target.U)}, h3_dot+ alpha*h:{dh3_dxA @ agent.xdot(x_value) + dh3_dxB @ target.xdot(target.U) + alpha3.value*h3}, dh3_dxA:{dh3_dxA}")
+        # print("slack",delta.value)
+        u1 = torch.matmul(e1,solution)
+        u1.backward()
+        # print("alpha",alpha_tch.grad.numpy())
+        # print("k", k_tch.grad.numpy())
+        u1_alpha1 = np.copy(alpha1_tch.grad.numpy().reshape(1,-1))
+        u1_alpha2 = np.copy(alpha2_tch.grad.numpy().reshape(1,-1))
+        u1_alpha3 = np.copy(alpha3_tch.grad.numpy().reshape(1,-1))
+        u1_k = np.copy(k_tch.grad.numpy().reshape(1,-1))
+        u1_grad = np.append(  u1_alpha1, u1_alpha2, axis=1  )
+        u1_grad = np.append( u1_grad, u1_alpha3, axis = 1 )
+        u1_grad = np.append( u1_grad, u1_k , axis = 1 )
+        # print("u1_grad",u1_grad)
+        
+
+        e2 = torch.tensor(np.array([0.0,1.0]), dtype=torch.float)        
+        u2 = torch.matmul(e2,solution)
+        u2.backward()
+        # print("alpha",alpha_tch.grad.numpy())
+        # print("k", k_tch.grad.numpy())
+        u2_alpha1 = np.copy(alpha1_tch.grad.numpy().reshape(1,-1)) - u1_alpha1
+        u2_alpha2 = np.copy(alpha2_tch.grad.numpy().reshape(1,-1)) - u1_alpha2
+        u2_alpha3 = np.copy(alpha3_tch.grad.numpy().reshape(1,-1)) - u1_alpha3
+        u2_k = np.copy(k_tch.grad.numpy().reshape(1,-1)) - u1_k
+        # u2_grad = np.append(  u2_alpha1, u2_alpha2, u2_alpha3, u2_k , axis=1  )
+        # print(f"u1_alpha1:{u1_alpha1}, u2_alpha1:{u2_alpha2}")
+        u2_grad = np.append(  u2_alpha1, u2_alpha2, axis=1  )
+        u2_grad = np.append( u2_grad, u2_alpha3, axis = 1 )
+        u2_grad = np.append( u2_grad, u2_k , axis = 1 )
 
         u_grad = np.append(u1_grad, u2_grad, axis=0)
         # print(u_grad)
@@ -256,6 +380,38 @@ class policy_learning_agent:
         policy_gradient = np.asarray(policy_gradient)
         self.actor.alpha_nominal = self.actor.alpha_nominal - self.beta*policy_gradient
 
+    def learn_and_update_weights_by_multiple_shooting_mono(self):
+        # Update alpha and k here
+
+        #replay buffer order: state, action, state_action_grad, reward, reward_grad, next_state, done, param_grad
+
+        # assert len(self.replay_memory_buffer)==self.horizon
+
+        policy_gradient = []
+        # print(len(self.replay_memory_buffer))
+        for index, value in enumerate(self.replay_memory_buffer): #index from 0 to horizon -1
+            state_action_grad = value[2]
+            reward_grad = value[4]
+            qp_param_grad = value[7]
+            # print("grad",reward_grad @ state_action_grad @ qp_param_grad)
+            policy_gradient.append( reward_grad @ state_action_grad @ qp_param_grad  )
+            # print("policy gradient",policy_gradient[-1])
+
+        policy_gradient = np.asarray(policy_gradient)
+        policy_gradient = np.sum(policy_gradient,axis = 0)
+        # print(policy_gradient)
+        print(f"alpha_nominal:{self.actor.alpha_nominal}, k:{self.actor.k_nominal}")
+        self.actor.alpha_nominal = self.actor.alpha_nominal + self.beta*policy_gradient[0]
+        self.actor.k_nominal = self.actor.k_nominal + self.beta*policy_gradient[1]
+        # print("beta",self.beta)
+
+        # clipping > 0
+        if self.actor.alpha_nominal < 0:
+            self.actor.alpha_nominal = 0
+        if self.actor.k_nominal < 0:
+            self.actor.k_nominal = 0
+        # print(f"policy_gradient:{policy_gradient}, alpha_nominal:{self.actor.alpha_nominal}, k_nominal:{self.actor.k_nominal}")
+
     def learn_and_update_weights_by_multiple_shooting(self):
         # Update alpha and k here
 
@@ -276,17 +432,23 @@ class policy_learning_agent:
         policy_gradient = np.asarray(policy_gradient)
         policy_gradient = np.sum(policy_gradient,axis = 0)
         # print(policy_gradient)
-        # print("alpha_nominal",self.actor.alpha_nominal)
-        self.actor.alpha_nominal = self.actor.alpha_nominal + self.beta*policy_gradient[0]
-        self.actor.k_nominal = self.actor.k_nominal + self.beta*policy_gradient[1]
+        # print(f"alpha_nominal:{self.actor.alpha_nominal}, k:{self.actor.k_nominal}")
+        self.actor.alpha1_nominal = self.actor.alpha1_nominal + self.beta*policy_gradient[0]
+        self.actor.alpha2_nominal = self.actor.alpha2_nominal + self.beta*policy_gradient[1]
+        self.actor.alpha3_nominal = self.actor.alpha3_nominal + self.beta*policy_gradient[2]
+        self.actor.k_nominal = self.actor.k_nominal + self.beta*policy_gradient[3]
         # print("beta",self.beta)
 
         # clipping > 0
-        if self.actor.alpha_nominal < 0:
-            self.actor.alpha_nominal = 0
+        if self.actor.alpha1_nominal < 0:
+            self.actor.alpha1_nominal = 0
+        if self.actor.alpha2_nominal < 0:
+            self.actor.alpha2_nominal = 0
+        if self.actor.alpha3_nominal < 0:
+            self.actor.alpha3_nominal = 0
         if self.actor.k_nominal < 0:
             self.actor.k_nominal = 0
-        # print(f"policy_gradient:{policy_gradient}, alpha_nominal:{self.actor.alpha_nominal}, k_nominal:{self.actor.k_nominal}")
+        # print(f"policy_gradient:{policy_gradient}, alpha1_nom:{self.actor.alpha_nominal}, alpha2_nom:{self.actor.alpha2_nominal}, alpha3_nom:{self.actor.alpha3_nominal} k_nominal:{self.actor.k_nominal}")
 
     def policy(self,follower,target):
         solved, U, param_grad, delta = self.actor.policy(follower,target)
@@ -381,6 +543,9 @@ def train(args):
         reward_moving_avg = []
 
         alphas = []
+        alpha1s = []
+        alpha2s = []
+        alpha3s = []
         ks = []
         deltas = []
 
@@ -389,6 +554,8 @@ def train(args):
         h3s = []
 
         TXs = []
+
+        actions = []
 
         metadata = dict(title='Movie Test', artist='Matplotlib',comment='Movie support!')
         writer = FFMpegWriter(fps=15, metadata=metadata)
@@ -503,10 +670,6 @@ def train(args):
 
                 agent.add_to_replay_memory(state, action, state_action_grad, reward, reward_grad, next_state, done, param_grad)
 
-                if done:
-                    print("Became Unsafe")
-                    break
-
                 # Update loop variables
                 state = next_state
 
@@ -514,12 +677,12 @@ def train(args):
                 TX_prev = TX
                 FX_prev = FX
                 t += dt
-                if (st+1) % args.horizon == 0 and st>=(args.buffer_capacity-1) and args.train==True:
-                    # print(len(agent.replay_memory_buffer))
-                    reward_moving_avg.append(reward_horizon)
-                    agent.learn_and_update_weights_by_multiple_shooting()
+                
                     
                 alphas.append(agent.actor.alpha_nominal)
+                alpha1s.append(agent.actor.alpha1_nominal)
+                alpha2s.append(agent.actor.alpha2_nominal)
+                alpha3s.append(agent.actor.alpha3_nominal)
                 ks.append(agent.actor.k_nominal)
                 t_plot.append(t)
                 deltas.append(delta)
@@ -527,9 +690,19 @@ def train(args):
                 h2s.append(h2)
                 h3s.append(h3)
                 TXs.append(TX)
+                actions.append(action)
+
+                if done:
+                    print("Became Unsafe")
+                    break
+
+                if (st+1) % args.horizon == 0 and st>=(args.buffer_capacity-1) and args.train==True:
+                    # print(len(agent.replay_memory_buffer))
+                    reward_moving_avg.append(reward_horizon)
+                    agent.learn_and_update_weights_by_multiple_shooting()
         # print(reward_episode)
         # print(reward_moving_avg)
-        return reward_episode, reward_moving_avg, alphas, ks, t_plot, deltas, h1s, h2s, h3s, TXs
+        return reward_episode, reward_moving_avg, alphas, ks, t_plot, deltas, h1s, h2s, h3s, TXs, actions, alpha1s, alpha2s, alpha3s
 
         # print("became unsafe")
         # reward_list.append(reward_episode)
@@ -565,12 +738,12 @@ parser.add_argument('--lr-critic', type=float, default=0.03, metavar='G',help='l
 parser.add_argument('--plot_freq', type=float, default=1, metavar='G',help='plotting frequency')
 parser.add_argument('--seed', type=int, default=123456, metavar='N',help='random seed (default: 123456)')
 parser.add_argument('--batch-size', type=int, default=10, metavar='N', help='batch size (default: 256)') #100
-parser.add_argument('--buffer-capacity', type=int, default=10, metavar='N', help='buffer_capacity')
+parser.add_argument('--buffer-capacity', type=int, default=20, metavar='N', help='buffer_capacity') #10
 parser.add_argument('--max-steps', type=int, default=300, metavar='N',help='maximum number of steps of each episode') #70
 parser.add_argument('--total-episodes', type=int, default=1, metavar='N',help='total training episodes') #1000
-parser.add_argument('--policy-freq', type=int, default=200, metavar='N',help='update frequency of target network ')
+parser.add_argument('--policy-freq', type=int, default=500, metavar='N',help='update frequency of target network ')
 parser.add_argument('--start-timestep', type=int, default=10000, metavar='N',help='number of steps using random policy')
-parser.add_argument('--horizon', type=int, default=3, metavar='N',help='RL time horizon')
+parser.add_argument('--horizon', type=int, default=2, metavar='N',help='RL time horizon') #3
 parser.add_argument('--alpha', type=float, default=0.15, metavar='G',help='CBF parameter')  #0.003
 parser.add_argument('--k', type=float, default=0.1, metavar='G',help='CLF parameter')  #0.003
 parser.add_argument('--train', type=float, default=True, metavar='G',help='CLF parameter')  #0.003
@@ -579,10 +752,11 @@ parser.add_argument('--movie_name', default="alpha_15_training.mp4")
 args = parser.parse_args("")
 
 Alphas = [0.113] #0.15 #0.115
-Ks = [2.0] #0.1 #2.0
+Ks = [20.0] #0.1 #2.0
 Trains = [True, False]
-# Betas = [-0.2, -0.05, -0.03, 0, 0.03, 0.05, 0.2]
-Betas = [-0.2]
+# Betas = [-0.5,-0.2, -0.05, -0.03, 0, 0.03, 0.05, 0.2, 0.5]
+Betas = [0.4, 0]
+movie_names = ['Adaptive.mp4','Non-Adaptive.mp4']
 
 reward_episodes = []
 reward_horizons = []
@@ -591,14 +765,17 @@ reward_horizons = []
 figure1, axis1 = plt.subplots(2, 2)
 
 # plt.figure()
-figure2, axis2 = plt.subplots(2, 1)
+figure2, axis2 = plt.subplots(1, 1)
 
 # plt.figure()
 figure3, axis3 = plt.subplots(1, 1)
 
 figure4, axis4 = plt.subplots(2, 1)
 
-colors = ['maroon','red','salmon','k','yellow','yellowgreen','darkgreen']
+figure5, axis5 = plt.subplots(2, 1)
+
+colors = ['purple','maroon','red','salmon','k','yellow','yellowgreen','darkgreen','teal']
+colors = ['r','g','b','k']
 colors2 = colors.copy()
 colors2.reverse()
 
@@ -609,48 +786,91 @@ for Alpha in Alphas:
             args.alpha = Alpha
             args.k = K
             args.lr_actor = Beta
-            args.train = False
+            args.train = True
+            args.movie_name = movie_names[index]
 
-            episode_reward, moving_reward, alphas, ks, t_plot, deltas, h1s, h2s, h3s, TXs =  train(args)
-            axis1[0,0].plot(t_plot,episode_reward,c = colors[index])
-            axis1[1,0].plot(moving_reward,c = colors[index])
-            axis1[0,1].plot(t_plot,alphas,c = colors[index])
-            axis1[1,1].plot(t_plot,ks,c = colors[index])
+            if index==0:
+                name = 'Adaptive Parameter'
+            else:
+                name = 'Constant parameter'
+            
+            episode_reward, moving_reward, alphas, ks, t_plot, deltas, h1s, h2s, h3s, TXs, actions, alpha1s, alpha2s, alpha3s =  train(args)
+            # axis1[0,0].plot(t_plot,episode_reward,c = colors[index])
+            # axis1[1,0].plot(moving_reward,c = colors[index])
+            # axis1[0,1].plot(t_plot,alphas,c = colors[index])
+            # axis1[1,1].plot(t_plot,ks,c = colors[index])
 
-            axis2[0].plot(t_plot,episode_reward,c = colors[index])
-            axis2[1].plot(t_plot,alphas,c = colors[index],label='alpha')
-            axis2[1].plot(t_plot,ks,c = colors2[index],label='k')
-            axis2[1].plot(t_plot,deltas,c = 'r',label='slack')
+            # Reward Plot
+            axis2.plot(t_plot,episode_reward,c = colors[index],label = name)
 
-            axis3.plot(t_plot,h1s,c = 'r',label='h1')
-            axis3.plot(t_plot,h2s,c = 'g',label='h2')
-            axis3.plot(t_plot,h3s,c = 'b',label='h3')
+            # Parameter Plot
+            axis1[0,0].plot(t_plot,alpha1s,c = colors[index],label = name)
+            axis1[1,0].plot(t_plot,alpha2s,c = colors[index],label = name)
+            axis1[0,1].plot(t_plot,alpha3s,c = colors[index],label = name)
+            axis1[1,1].plot(t_plot,ks,c = colors[index],label = name)
 
+            
+            # axis2[0].plot(t_plot,episode_reward,c = colors[index])
+            # # axis2[1].plot(t_plot,alphas,c = colors[index],label='alpha')
+            # axis2[1].plot(t_plot,alpha1s,c = 'salmon',label='alpha1')
+            # axis2[1].plot(t_plot,alpha2s,c = 'yellow',label='alpha2')
+            # axis2[1].plot(t_plot,alpha3s,c = 'purple',label='alpha3')
+            # axis2[1].plot(t_plot,ks,c = 'r',label='k')
+            # axis2[1].plot(t_plot,ks,c = colors2[index],label='k')
+            # axis2[1].plot(t_plot,deltas,c = 'r',label='slack')
+
+            # Barrier Function Plots
+            axis3.plot(t_plot,h1s,colors[index],label = name)
+            # style = colors[index]+'.'
+            # print(style)
+            axis3.plot(t_plot,h2s,(colors[index]+'.'),label = name)
+            axis3.plot(t_plot,h3s,(colors[index]+'--'),label = name)
+
+            # Target Movement Plot
             axis4[0].plot(t_plot,[x[0] for x in TXs],c = 'r',label='X')
             axis4[1].plot(t_plot,[x[1] for x in TXs],c = 'g',label='Y')
+
+            # Control Input plot
+            axis5[0].plot(t_plot,[x[0] for x in actions],c = colors[index],label = name)
+            axis5[1].plot(t_plot,[x[1] for x in actions],c = colors[index],label = name)
 
             index += 1
 
 plt.ioff()
-axis1[0,0].set_title("Reward with time")
-axis1[1,0].set_title("Moving Horizon Reward")
-axis1[0,1].set_title("alpha")
-axis1[1,1].set_title("k")
 
+# Parameter Plot
+axis1[0,0].set_title(r"$\alpha_1 $")
+# axis1[0,0].legend()
+# axis1[0,0].set_xlabel('time (s)')
+axis1[1,0].set_title(r"$\alpha_2 $")
+axis1[1,0].set_xlabel('time (s)')
+# axis1[1,0].legend()
+axis1[0,1].set_title(r"$\alpha_3 $")
+# axis1[0,1].set_xlabel('time (s)')
+axis1[0,1].legend()
+axis1[1,1].set_title(r"$k$")
+axis1[1,1].set_xlabel('time (s)')
+# axis1[1,1].legend()
 
-axis2[0].set_title("Reward with time",y=1.0,pad=-14)
-axis2[1].set_title("Parameters",y=1.0,pad=-14)
-axis2[1].set_xlabel('time step')
-axis2[1].legend()
+# Reward Plot
+axis2.set_title("Reward with time")#,y=1.0,pad=-14)
+axis2.set_xlabel('time step')
+axis2.legend()
 
-axis3.set_title("Barrier Functions",y=1.0,pad=-14)
+# Barrier Function Plots
+axis3.set_title("Barrier Functions")#,y=1.0,pad=-14)
 axis3.set_xlabel('time step')
 axis3.legend()
 
 axis4[0].set_title('Target Position')
 axis4[0].legend()
 axis4[1].legend()
-axis2[1].set_xlabel('time step')
+axis4[1].set_xlabel('time step')
+
+axis5[0].set_title('Control Inputs')
+axis5[0].legend()
+axis5[1].legend()
+axis5[1].set_xlabel('time step')
 
 plt.show()
             
