@@ -94,16 +94,17 @@ def run(args):
 
         # n_robots = 1
 
-        # # add barrier constraints to agents
-        # for i in range(n_robots):
-        #     for j in range(i,n_robots):
-        #         u_i = u[i*states_per_robot:i*inputs_per_robot + inputs_per_robot,0]
-        #         u_j = u[j*states_per_robot:j*inputs_per_robot + inputs_per_robot,0]
-        #         alpha_ij = alpha_agents[ i,j ]
-        #         alpha_ji = alpha_agents[ j,i ]
-        #         h, dh_dxi, dh_dxj = robots[i].agentBarrier(robots[j],min_D)
-        #         cons += [ dh_dxi @ robots[i].xdot(u_i) + dh_dxj @ robots[j].xdot(u_j) >= -alpha_ij*h]
-        #         cons += [alpha_ij == alpha_ji]
+        # add barrier constraints to agents
+        for i in range(n_robots):
+            for j in range(i+1,n_robots):
+                u_i = u[i*states_per_robot:i*inputs_per_robot + inputs_per_robot,0]
+                u_j = u[j*states_per_robot:j*inputs_per_robot + inputs_per_robot,0]
+                alpha_ij = alpha_agents[ i,j ]
+                alpha_ji = alpha_agents[ j,i ]
+                h, dh_dxi, dh_dxj = robots[i].agentBarrier(robots[j],min_D)
+                print("h",h)
+                cons += [ dh_dxi @ robots[i].xdot(u_i) + dh_dxj @ robots[j].xdot(u_j) >= -alpha_ij*h]
+                cons += [alpha_ij == alpha_ji]
 
 
         # add barrier constraints to obstacles
@@ -141,7 +142,10 @@ def run(args):
         # assert problem.is_dpp()
         # problem.solve(verbose=True)
         problem.solve()
-        print("status",problem.status)
+        # print("status",problem.status)
+        if problem.status != 'optimal':
+            print("PROBLEM NOT FEASIBLE")
+            exit()
 
         # print("input",u.value[0:2])
         print("delta",delta.value)
