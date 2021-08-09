@@ -49,7 +49,7 @@ def build_GP_model(N):
     noise = 0.01
     for i in range(N):
         kern = 1.0 * RBF(length_scale=2, length_scale_bounds=(1e-2, 1e3)) + WhiteKernel(noise_level=0.1, noise_level_bounds=(1e-10, 1e+1))
-        gp = GaussianProcessRegressor(kernel=kern, alpha = noise, n_restarts_optimizer=3)
+        gp = GaussianProcessRegressor(kernel=kern, alpha = noise, n_restarts_optimizer=1)
         GP_list.append(gp)
     return GP_list
 
@@ -607,9 +607,9 @@ def train(args):
                 replay_buffer_gp_x.append(agentF.X[2,0])
                 # pred_d1.append(d1); pred_d2.append(d2); pred_d3.append(d3)
                 ## actual
-                agentF.f_corrected = np.array([agentF.d1*np.cos(agentF.X[2][0]),agentF.d2*np.sin(agentF.X[2][0]),agentF.d3]).reshape(-1,1)
+                # agentF.f_corrected = np.array([agentF.d1*np.cos(agentF.X[2][0]),agentF.d2*np.sin(agentF.X[2][0]),agentF.d3]).reshape(-1,1)
                 ## predicted
-                # agentF.f_corrected = np.array([d1*np.cos(agentF.X[2][0]),d2*np.sin(agentF.X[2][0]),d3]).reshape(-1,1)
+                agentF.f_corrected = np.array([d1*np.cos(agentF.X[2][0]),d2*np.sin(agentF.X[2][0]),d3]).reshape(-1,1)
                 ## ignored
                 # agentF.f_corrected = np.array([0*np.cos(agentF.X[2][0]),0*np.sin(agentF.X[2][0]),0]).reshape(-1,1)
 
@@ -635,9 +635,9 @@ def train(args):
                 replay_buffer_d3.append(d3_obs)
 
                 # s = time.time()
-                # update_GP_dynamics(GP_list,replay_buffer_gp_x, replay_buffer_d1, 0, replay_buffer_gp_x[-1])
-                # update_GP_dynamics(GP_list,replay_buffer_gp_x, replay_buffer_d2, 1, replay_buffer_gp_x[-1])
-                # update_GP_dynamics(GP_list,replay_buffer_gp_x, replay_buffer_d3, 2, replay_buffer_gp_x[-1])
+                update_GP_dynamics(GP_list,replay_buffer_gp_x, replay_buffer_d1, 0, replay_buffer_gp_x[-1])
+                update_GP_dynamics(GP_list,replay_buffer_gp_x, replay_buffer_d2, 1, replay_buffer_gp_x[-1])
+                update_GP_dynamics(GP_list,replay_buffer_gp_x, replay_buffer_d3, 2, replay_buffer_gp_x[-1])
                 # print("update time",time.time()-s)
 
                 # Compute reward
@@ -739,7 +739,7 @@ parser.add_argument('--plot_freq', type=float, default=1, metavar='G',help='plot
 parser.add_argument('--seed', type=int, default=123456, metavar='N',help='random seed (default: 123456)')
 parser.add_argument('--batch-size', type=int, default=10, metavar='N', help='batch size (default: 256)') #100
 parser.add_argument('--buffer-capacity', type=int, default=20, metavar='N', help='buffer_capacity') #10
-parser.add_argument('--max-steps', type=int, default=300, metavar='N',help='maximum number of steps of each episode') #70
+parser.add_argument('--max-steps', type=int, default=200, metavar='N',help='maximum number of steps of each episode') #70
 parser.add_argument('--total-episodes', type=int, default=1, metavar='N',help='total training episodes') #1000
 parser.add_argument('--policy-freq', type=int, default=500, metavar='N',help='update frequency of target network ')
 parser.add_argument('--start-timestep', type=int, default=10000, metavar='N',help='number of steps using random policy')
@@ -748,14 +748,15 @@ parser.add_argument('--alpha', type=float, default=0.15, metavar='G',help='CBF p
 parser.add_argument('--k', type=float, default=0.1, metavar='G',help='CLF parameter')  #0.003
 parser.add_argument('--train', type=float, default=True, metavar='G',help='CLF parameter')  #0.003
 parser.add_argument('--movie', type=float, default=True, metavar='G',help='CLF parameter')  #0.003
-parser.add_argument('--movie_name', default="alpha_15_training.mp4")
+parser.add_argument('--movie_name', default="test.mp4")
 args = parser.parse_args("")
 
-Alphas = [0.113] #0.15 #0.115
-Ks = [20.0] #0.1 #2.0
+Alphas = [0.0] #0.15 #0.115
+Ks = [0.1] #0.1 #2.0
 Trains = [True, False]
 # Betas = [-0.5,-0.2, -0.05, -0.03, 0, 0.03, 0.05, 0.2, 0.5]
-Betas = [0.4, 0]
+# Betas = [0.4, 0]
+Betas = [0.4]
 movie_names = ['Adaptive.mp4','Non-Adaptive.mp4']
 
 reward_episodes = []
@@ -787,18 +788,15 @@ for Alpha in Alphas:
             args.k = K
             args.lr_actor = Beta
             args.train = True
-            args.movie_name = movie_names[index]
+            # args.movie_name = movie_names[index]
 
             if index==0:
                 name = 'Adaptive Parameter'
             else:
                 name = 'Constant parameter'
+            # name = 'test'
             
             episode_reward, moving_reward, alphas, ks, t_plot, deltas, h1s, h2s, h3s, TXs, actions, alpha1s, alpha2s, alpha3s =  train(args)
-            # axis1[0,0].plot(t_plot,episode_reward,c = colors[index])
-            # axis1[1,0].plot(moving_reward,c = colors[index])
-            # axis1[0,1].plot(t_plot,alphas,c = colors[index])
-            # axis1[1,1].plot(t_plot,ks,c = colors[index])
 
             # Reward Plot
             axis2.plot(t_plot,episode_reward,c = colors[index],label = name)
@@ -809,22 +807,14 @@ for Alpha in Alphas:
             axis1[0,1].plot(t_plot,alpha3s,c = colors[index],label = name)
             axis1[1,1].plot(t_plot,ks,c = colors[index],label = name)
 
-            
-            # axis2[0].plot(t_plot,episode_reward,c = colors[index])
-            # # axis2[1].plot(t_plot,alphas,c = colors[index],label='alpha')
-            # axis2[1].plot(t_plot,alpha1s,c = 'salmon',label='alpha1')
-            # axis2[1].plot(t_plot,alpha2s,c = 'yellow',label='alpha2')
-            # axis2[1].plot(t_plot,alpha3s,c = 'purple',label='alpha3')
-            # axis2[1].plot(t_plot,ks,c = 'r',label='k')
-            # axis2[1].plot(t_plot,ks,c = colors2[index],label='k')
             # axis2[1].plot(t_plot,deltas,c = 'r',label='slack')
 
             # Barrier Function Plots
-            axis3.plot(t_plot,h1s,colors[index],label = name)
+            axis3.plot(t_plot,h1s,colors[index],label = 'h1 '+ name)
             # style = colors[index]+'.'
             # print(style)
-            axis3.plot(t_plot,h2s,(colors[index]+'.'),label = name)
-            axis3.plot(t_plot,h3s,(colors[index]+'--'),label = name)
+            axis3.plot(t_plot,h2s,(colors[index]+'.'),label = 'h2 ' + name)
+            axis3.plot(t_plot,h3s,(colors[index]+'--'),label = 'h3 ' + name)
 
             # Target Movement Plot
             axis4[0].plot(t_plot,[x[0] for x in TXs],c = 'r',label='X')
@@ -840,17 +830,12 @@ plt.ioff()
 
 # Parameter Plot
 axis1[0,0].set_title(r"$\alpha_1 $")
-# axis1[0,0].legend()
-# axis1[0,0].set_xlabel('time (s)')
 axis1[1,0].set_title(r"$\alpha_2 $")
 axis1[1,0].set_xlabel('time (s)')
-# axis1[1,0].legend()
 axis1[0,1].set_title(r"$\alpha_3 $")
-# axis1[0,1].set_xlabel('time (s)')
 axis1[0,1].legend()
 axis1[1,1].set_title(r"$k$")
 axis1[1,1].set_xlabel('time (s)')
-# axis1[1,1].legend()
 
 # Reward Plot
 axis2.set_title("Reward with time")#,y=1.0,pad=-14)
