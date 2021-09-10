@@ -16,7 +16,7 @@ class torch_dynamics(torch.autograd.Function):
         
         # for gradient computation
         df_dx =  df_dx_(x) 
-        dgxu_dx = dgxu_dx_(x)  
+        dgxu_dx = dgxu_dx_(x, u)  
             
         # save tensors for use in backward computation later on
         ctx.save_for_backward(x,u, gx, df_dx, dgxu_dx)
@@ -50,14 +50,14 @@ dtype = torch.float
 device = torch.device("cpu")
 
 dynam = torch_dynamics.apply
-x = torch.tensor(np.array([1,1]).reshape(-1,1),dtype=dtype, requires_grad=True)
+x = torch.tensor(np.array([1,1,0]).reshape(-1,1),dtype=dtype, requires_grad=True)
 u = torch.tensor(np.array([3,2]).reshape(-1,1),dtype=dtype, requires_grad=True)
 
 # input = torch.tensor(np.append(x,u,axis=0),dtype=dtype, requires_grad=True)
 
 y_pred = dynam(x,u)
-print(y_pred)
 loss = y_pred.sum()
 loss.backward()
+
 print("x grad", x.grad)
 print("u grad", u.grad)
