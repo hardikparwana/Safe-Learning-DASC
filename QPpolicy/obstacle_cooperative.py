@@ -48,6 +48,77 @@ fig = plt.figure()
 ax = plt.axes(xlim=(-10,10),ylim=(-10,10))
 
 
+def solve_QP(robots, x, problem, k1, alpha1, alpha2, alpha3):
+    assert problem.is_dpp()
+    cvxpylayer = CvxpyLayer(problem, parameters=[k1, alpha1, alpha2, alpha3], variables=[x])
+
+    k1_tch = torch.tensor(k1.value, requires_grad=True, dtype=torch.float)
+    alpha1_tch = torch.tensor(alpha1.value, requires_grad=True, dtype=torch.float) 
+    alpha2_tch = torch.tensor(alpha2.value, requires_grad=True, dtype=torch.float)
+    alpha3_tch = torch.tensor(alpha3.value, requires_grad=True, dtype=torch.float)
+
+    solver_args = {
+            'verbose': False,
+            'max_iters': 1000000
+    }
+
+    try:
+            solution, = cvxpylayer(k1_tch, alpha1_tch, alpha2_tch, alpha3_tch, solver_args=solver_args)
+    except:
+        print("SBF QP not solvable")
+        return False, np.array([0,0]).reshape(-1,1), 0, 0
+
+    x_value = solution.detach().numpy()
+
+    # Varibale size
+    x_size = x.size
+    u_alpha1 = []
+    u_alpha2 = []
+    u_alpha3 = []
+    u_k1 = []
+
+    u_alpha1_sum = []
+    u_alpha2_sum = []
+    u_alpha3_sum = []
+    u_alpha4_sum = []
+
+    for i in range(x_size):
+        e_np = np.zeros(x_size)
+        e_np[i] = 1
+        ei = torch.tensor(e_np, dtype=torch.float)
+        ui = torch.matmul(ei,solution)
+        ui.backward()
+
+        ui_alpha1 = np.copy(alpha1_tch.grad.numpy().reshape(1,-1))
+        ui_alpha2 = np.copy(alpha2_tch.grad.numpy().reshape(1,-1))
+        ui_alpha3 = np.copy(alpha3_tch.grad.numpy().reshape(1,-1))
+        ui_k1 = np.copy(k1_tch.grad.numpy().reshape(1,-1))
+
+        try:
+            u_alpha1_sum = u_alpha1_sum + ui_alpha1
+            u_alpha2_sum = u_alpha2_sum + ui_alpha2
+            u_alpha3_sum = u_alpha3_sum + ui_alpha3
+            u_k1_sum = u_k1_sum + ui_k1
+            np.append(u_alpha1,ui_alpha1,axis=0)
+            np.append(u_alpha2,ui_alpha1,axis=0)
+            np.append(u_alpha3,ui_alpha1,axis=0)
+            np.append(u_k1,ui_k1,axis=0)
+
+        except Exception as e:
+            u_alpha1 = np.copy(ui_alpha1)
+            u_alpha2 = np.copy(ui_alpha2)
+            u_alpha3 = np.copy(ui_alpha3)
+            u_k1 = np.copy(ui_k1)
+
+
+    e1 = torch.tensor(np.array([1.0,0]), dtype=torch.float)
+
+    
+
+    u1 = torch.matmul(e1,solution)
+    u1.backward()
+
+
 
 def run(args):
 

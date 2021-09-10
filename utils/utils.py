@@ -14,7 +14,7 @@ def wrap_angle(angle):
     return angle
 
 def nCr(n,r):
-    return 
+    return math.factorial(n)*math.factorial()
 
 
 def build_GP_model(N):

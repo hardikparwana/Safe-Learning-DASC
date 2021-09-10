@@ -1,4 +1,23 @@
 import numpy as np
+import torch
+
+def fx_(x):
+    return x
+
+def gx_(x):
+    return torch.tensor(np.array([[1,0],[0,1]]),dtype=torch.float);
+
+def df_dx_(x, type = 'tensor'):
+    if type == 'numpy':
+        return np.array(np.array([[1,0],[0,1]]))
+    if type == 'tensor':
+        return torch.tensor([[1,0],[0,1]],dtype=torch.float)
+    
+def dgxu_dx_(x, type='tensor'):
+    if type == 'numpy':
+        return np.array([[0,0],[0,0]])
+    if type == 'tensor':
+        return torch.tensor([[0,0],[0,0]],dtype=torch.float)
 
 class Unicycle2D:
     

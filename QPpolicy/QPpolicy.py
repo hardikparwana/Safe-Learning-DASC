@@ -171,6 +171,7 @@ class Actor:
         # print("slack",delta.value)
         u1 = torch.matmul(e1,solution)
         u1.backward()
+
         # print("alpha",alpha_tch.grad.numpy())
         # print("k", k_tch.grad.numpy())
         u1_alpha = np.copy(alpha_tch.grad.numpy().reshape(1,-1))
