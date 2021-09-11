@@ -1,4 +1,27 @@
 import numpy as np
+import torch
+
+def fx_(x):
+    return torch.tensor(np.array([0,0]).reshape(-1,1),dtype=torch.float)
+
+def gx_(x):
+    g_ = np.array([ [1,0],[0,1]])
+    return torch.tensor(g_,dtype=torch.float)
+
+def df_dx_(x, type = 'tensor'):
+    dfdx = np.array([[0,0],[0,0]])
+    if type == 'numpy':
+        return dfdx
+    if type == 'tensor':
+        return torch.tensor(dfdx,dtype=torch.float)
+    
+def dgxu_dx_(x, u, type='tensor'):
+    u_ = u.detach().numpy()
+    dgxudx = np.array([[0, 0],[0, 0]])
+    if type == 'numpy':
+        return dgxudx
+    if type == 'tensor':
+        return torch.tensor(dgxudx,dtype=torch.float)
 
 class SingleIntegrator:
     

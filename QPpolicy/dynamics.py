@@ -1,7 +1,8 @@
 import torch
 import numpy as np
 from robot_models.Unicycle2D import *
-
+# from robot_models.SingleIntegrator import *
+# from robot_models.DoubleIntegrator2D import *
 
 class torch_dynamics(torch.autograd.Function):
 
@@ -20,7 +21,6 @@ class torch_dynamics(torch.autograd.Function):
             
         # save tensors for use in backward computation later on
         ctx.save_for_backward(x,u, gx, df_dx, dgxu_dx)
-
         return fx + torch.matmul(gx, u)
 
     @staticmethod
@@ -36,7 +36,7 @@ class torch_dynamics(torch.autograd.Function):
         n_x = np.shape(x)[0]
         n_u = np.shape(u)[0]
                
-        print(grad_output)
+        # print(grad_output)
         
         gradient_x = df_dx + dgxu_dx
         gradient_u =  gx 
@@ -46,18 +46,46 @@ class torch_dynamics(torch.autograd.Function):
 
         return output_grad_x, output_grad_u
 
-dtype = torch.float
-device = torch.device("cpu")
 
-dynam = torch_dynamics.apply
-x = torch.tensor(np.array([1,1,0]).reshape(-1,1),dtype=dtype, requires_grad=True)
-u = torch.tensor(np.array([3,2]).reshape(-1,1),dtype=dtype, requires_grad=True)
+'''
+TEST 
+'''
+# dtype = torch.float
+# device = torch.device("cpu")
+# dynam = torch_dynamics.apply
 
-# input = torch.tensor(np.append(x,u,axis=0),dtype=dtype, requires_grad=True)
+## Unicycle
 
-y_pred = dynam(x,u)
-loss = y_pred.sum()
-loss.backward()
+# x = torch.tensor(np.array([1,1,0]).reshape(-1,1),dtype=dtype, requires_grad=True)
+# u = torch.tensor(np.array([3,2]).reshape(-1,1),dtype=dtype, requires_grad=True)
 
-print("x grad", x.grad)
-print("u grad", u.grad)
+# y_pred = dynam(x,u)
+# loss = y_pred.sum()
+# loss.backward()
+
+# print("x grad", x.grad)
+# print("u grad", u.grad)
+
+## Single Integrator
+
+# x = torch.tensor(np.array([1,1]).reshape(-1,1),dtype=dtype, requires_grad=True)
+# u = torch.tensor(np.array([3,2]).reshape(-1,1),dtype=dtype, requires_grad=True)
+
+# y_pred = dynam(x,u)
+# loss = y_pred.sum()
+# loss.backward()
+
+# print("x grad", x.grad)
+# print("u grad", u.grad)
+
+## Double Integrator
+
+# x = torch.tensor(np.array([1,1,1,1]).reshape(-1,1),dtype=dtype, requires_grad=True)
+# u = torch.tensor(np.array([3,2]).reshape(-1,1),dtype=dtype, requires_grad=True)
+
+# y_pred = dynam(x,u)
+# loss = y_pred.sum()
+# loss.backward()
+
+# print("x grad", x.grad)
+# print("u grad", u.grad)

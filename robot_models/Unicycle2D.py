@@ -1,16 +1,21 @@
 import numpy as np
+import cvxpy as cp
 import torch
+import math
+
+dt = 0.01
 
 def fx_(x):
-    return torch.tensor(np.array([0,0,0]).reshape(-1,1),dtype=torch.float)
+    return x + torch.tensor(np.array([0.0,0.0,0.0]).reshape(-1,1)*dt,dtype=torch.float)
+    # return torch.tensor(np.array([0.0,0.0,0.0]).reshape(-1,1)*dt,dtype=torch.float)
 
 def gx_(x):
     x_ = x.detach().numpy()
-    g_ = np.array([ [np.cos(x[2,0]),0],[np.sin(x[2,0]),0],[0,1] ])
+    g_ = np.array([ [np.cos(x[2,0]),0.0],[np.sin(x[2,0]),0.0],[0,1] ])*dt
     return torch.tensor(g_,dtype=torch.float)
 
 def df_dx_(x, type = 'tensor'):
-    dfdx = np.array([[0,0,0],[0,0,0],[0,0,0]])
+    dfdx = np.eye(3) + np.array([[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0]])*dt
     if type == 'numpy':
         return dfdx
     if type == 'tensor':
@@ -18,7 +23,7 @@ def df_dx_(x, type = 'tensor'):
     
 def dgxu_dx_(x, u, type='tensor'):
     u_ = u.detach().numpy()
-    dgxudx = np.array([[0, 0, -u[0,0]*np.sin(x[2,0]) ],[0, 0, u[0,0]*np.cos(x[2,0])],[ 0,0,0 ]])
+    dgxudx = np.array([[0.0, 0.0, -u[0,0]*np.sin(x[2,0]) ],[0.0, 0.0, u[0,0]*np.cos(x[2,0])],[ 0.0,0.0,0.0 ]])*dt
     if type == 'numpy':
         return dgxudx
     if type == 'tensor':
@@ -33,10 +38,10 @@ class Unicycle2D:
         self.d1 = 1*np.sin(self.X[2,0])**2 + 1*np.sin(self.X[2,0]*16) 
         self.d2 = 1*np.sin(self.X[2,0])**2 + 1*np.sin(self.X[2,0]*16)
         self.d3 = 0.3
-        self.f = np.array([0,0,0]).reshape(-1,1)
-        self.g = np.array([ [np.cos(X0[2,0]),0],[np.sin(X0[2,0]),0],[0,1] ])
-        self.f_corrected = np.array([0,0,0]).reshape(-1,1)
-        self.g_corrected = np.array([ [0,0],[0,0],[0,0] ])
+        self.f = np.array([0.0,0.0,0.0]).reshape(-1,1)
+        self.g = np.array([ [np.cos(X0[2,0]),0.0],[np.sin(X0[2,0]),0.0],[0.0,1.0] ])
+        self.f_corrected = np.array([0.0,0.0,0.0]).reshape(-1,1)
+        self.g_corrected = np.array([ [0.0,0.0],[0.0,0.0],[0.0,0.0] ])
 
         self.FoV_length = fov_length
         self.FoV_angle = fov_angle
@@ -52,18 +57,16 @@ class Unicycle2D:
         self.g = np.array([ [np.cos(self.X[2,0]),0],[np.sin(self.X[2,0]),0],[0,1] ])
 
         # disturbance term
-        self.d1 = 1*np.sin(self.X[2][0])**2 + 1*np.sin(self.X[2][0]*16) #sin(u)
-        self.d2 = 1*np.sin(self.X[2,0])**2 + 1*np.sin(self.X[2,0]*16)
-        self.d3 = 0.3
+        # self.d1 = 1*np.sin(self.X[2][0])**2 + 1*np.sin(self.X[2][0]*16) #sin(u)
+        # self.d2 = 1*np.sin(self.X[2,0])**2 + 1*np.sin(self.X[2,0]*16)
+        # self.d3 = 0.3
         
         extra_f = np.array([self.d1*np.cos(self.X[2][0]),self.d2*np.sin(self.X[2][0]),self.d3]).reshape(-1,1)
         extra_g = np.array([ [0,0],[0,0],[0,0] ])
-        
         self.X = self.X + (extra_f + extra_g @ U + self.f + self.g @ U)*self.dt
         # print("gU",self.g @ U)
     
         self.X[2,0] = self.wrap_angle(self.X[2,0])
-        
         return self.X
 
     def step_sim(self,U):
@@ -123,6 +126,10 @@ class Unicycle2D:
     def xdot(self,U):
         # print("g",self.g + self.g_corrected)
         return ( self.f + self.f_corrected + (self.g + self.g_corrected) @ U )
+
+    def xdot_cp(self,x,U):
+        # print("g",self.g + self.g_corrected)
+        return ( self.f + self.g @ U )
     
     def CBF_loss(self,target,u,w):
 
@@ -146,9 +153,14 @@ class Unicycle2D:
         h = self.max_D**2 - np.linalg.norm( self.X[0:2,0] - target.X[:,0] )**2
         dh_dx_agent = np.append(- 2*( self.X[0:2,0] - target.X[:,0] ),0)
         dh_dx_target = 2*( self.X[0:2,0] - target.X[:,0] )
+        
+        return h, dh_dx_agent, dh_dx_target  #h_dot_A, h_dot_B
 
-        # h_dot_B = 2*( self.X[0:2,0] - target.X[:,0] ) @ target.V  - 2*( self.X[0:2,0] - target.X[:,0] ) @ ( self.f[0:2,:]  ) - 2*( self.X[0:2,0] - target.X[:,0] ) @ ( self.f_corrected[0:2,:]  )
-        # h_dot_A = - 2*( self.X[0:2,0] - target.X[:,0] ) @ ( self.g[0:2,:]  ) - 2*( self.X[0:2,0] - target.X[:,0] ) @ ( self.g_corrected[0:2,:]  )
+    def CBF1_loss_cp(self, x, target):
+        # h = self.max_D**2 - cp.square(cp.norm( x[0:2,0] - target.X[:,0] ))
+        h = self.max_D - cp.norm( x[0:2,0] - target.X[:,0] )
+        dh_dx_agent = cp.hstack([- 2*( x[0,0] - target.X[0,0] ), - 2*( x[0,0] - target.X[0,0] ),0])
+        dh_dx_target = cp.hstack( [2*( x[0,0] - target.X[0,0] ), 2*( x[1,0] - target.X[1,0] )] )
         
         return h, dh_dx_agent, dh_dx_target  #h_dot_A, h_dot_B
 
@@ -162,8 +174,20 @@ class Unicycle2D:
         dh_dx_agent = np.append(2*( self.X[0:2,0] - target.X[:,0] ),0)
         dh_dx_target = - 2*( self.X[0:2,0] - target.X[:,0] )
 
-        # h_dot_B = - 2*( self.X[0:2,0] - target.X[:,0] ) @ target.V  + 2*( self.X[0:2,0] - target.X[:,0] ) @ ( self.f[0:2,:]  ) + 2*( self.X[0:2,0] - target.X[:,0] ) @ ( self.f_corrected[0:2,:]  )
-        # h_dot_A =   2*( self.X[0:2,0] - target.X[:,0] ) @ ( self.g[0:2,:]  ) + 2*( self.X[0:2,0] - target.X[:,0] ) @ ( self.g_corrected[0:2,:]  )
+        return h, dh_dx_agent, dh_dx_target #h_dot_A, h_dot_B
+
+    def CBF2_loss_cp(self, x, target):
+        h = cp.square(cp.norm( x[0:2,0] - target.X[:,0] )) - self.min_D**2
+        dh_dx_agent = cp.hstack([ 2*( x[0,0] - target.X[0,0] ), 2*( x[0,0] - target.X[0,0] ), 0]) 
+        dh_dx_target = cp.hstack([- 2*( x[0,0] - target.X[0,0]), - 2*( x[1,0] - target.X[1,0]) ])
+
+        return h, dh_dx_agent, dh_dx_target #h_dot_A, h_dot_B
+
+    def CBF2_loss_tensor(self, x, target):
+        h = cp.square(cp.norm( x[0:2,0] - target.X[:,0] )) - self.min_D**2
+        dh_dx_agent = cp.hstack([ 2*( x[0,0] - target.X[0,0] ), 2*( x[0,0] - target.X[0,0] ), 0]) 
+        dh_dx_target = cp.hstack([- 2*( x[0,0] - target.X[0,0]), - 2*( x[1,0] - target.X[1,0]) ])
+
         return h, dh_dx_agent, dh_dx_target #h_dot_A, h_dot_B
 
     def CBF2_sim_loss(self,Fx,Tx):
@@ -189,11 +213,20 @@ class Unicycle2D:
 
         return dh_dx
 
+    def cp_cos(self,x):        
+        cosine = 1 - cp.power(x,2)/2 + cp.power(x,4)/math.factorial(3) - cp.power(x,6)/math.factorial(6) + cp.power(x,8)/math.factorial(8) - cp.power(x,10)/math.factorial(10) + cp.power(x,12)/math.factorial(12)
+        return cosine
+
+    def cp_sin(self,x):        
+        sine = x - cp.power(x,3)/6 + cp.power(x,5)/math.factorial(5) - cp.power(x,7)/math.factorial(7) + cp.power(x,9)/math.factorial(9) - cp.power(x,11)/math.factorial(11) + cp.power(x,13)/math.factorial(13)
+        return sine
+
 
     def CBF3_loss(self,target):
         theta = self.X[2,0]
         # Direction Vector
         bearing_vector = np.array([np.cos(theta),np.sin(theta)]) @ (target.X[:,0] - self.X[0:2,0])/np.linalg.norm(target.X[:,0] - self.X[0:2,0])
+        
         h = (bearing_vector - np.cos(self.FoV_angle/2))/(1.0-np.cos(self.FoV_angle/2))
 
         dir_vector = np.array([np.cos(theta),np.sin(theta)])
@@ -211,17 +244,69 @@ class Unicycle2D:
         dh_dx_target = dh_dx
         # print(f"dh_dx:{dh_dx}, dh_dtheta:{dh_dTheta}, dh_dAgent:{dh_dx_agent}")
 
-        # dh_dx_agent = np.append(-factor + factor_2, dh_dTheta  )
-        # dh_dx_target = factor
-        # vect = (target.X[:,0] - self.X[0:2,0])/np.linalg.norm(target.X[:,0] - self.X[0:2,0])
-        # print("vect",vect)
-        # dh_dTheta = np.array([-np.sin(theta),np.cos(theta)]) @ (target.X[:,0] - self.X[0:2,0])/np.linalg.norm(target.X[:,0] - self.X[0:2,0])
-        # dh_dx_agent = np.append(-factor + factor_2, dh_dTheta  )
-        # dh_dx_target = factor
-
-        # h_dot_B = factor @ target.V.reshape(-1,1) - factor @ self.f[0:2,:] - factor @ self.f_corrected[0:2,:] + factor_2 * self.f[2,:] + factor_2 * self.f_corrected[2,:]
-        # h_dot_A = -factor @ self.g[0:2,:] - factor @ self.g_corrected[0:2,:] + factor_2 * self.g[2,:] + factor_2 * self.g_corrected[2,:]
         return h, dh_dx_agent/(1.0-np.cos(self.FoV_angle/2)), dh_dx_target/(1.0-np.cos(self.FoV_angle/2)) #h_dot_A, h_dot_B
+
+    def CBF3_loss_cp(self,x,cos_sin,target):
+       
+        print("diff", target.X - x[0:2])
+        bearing_vector  = cos_sin.T @ (target.X - x[0:2])
+        bearing_vector = bearing_vector/cp.norm(target.X[:,0] - x[0:2,0])
+
+        h = (bearing_vector - np.cos(self.FoV_angle/2))/(1.0-np.cos(self.FoV_angle/2))
+
+        dir_vector = cos_sin
+        
+        # p_transpose = np.array([target.X[0,0],target.X[1,0]]) - np.array([x[0,0],x[1,0]])
+        # p = p_transpose.reshape(-1,1)
+        p = target.X - x[0:2]
+        norm_p = cp.norm(p)
+        # x = X_L - X_F
+        #dh_dx = dir_vector/cp.norm(p,2) - ( (dir_vector @ p) * p_transpose )/cp.norm(p)**3   
+        print("1",dir_vector/norm_p)
+        dh_dx = dir_vector/norm_p - ( ( dir_vector.T @ p ) * p )/cp.power(norm_p,3)
+        print("dhdx",dh_dx.shape)
+            
+        dh_dTheta = ( -sin_theta * p[0,0] + cos_theta * p[1,0] )/cp.norm(p)
+        dh_dx_agent = cp.hstack([-dh_dx[0,0], -dh_dx[1,0], dh_dTheta ])
+        dh_dx_target = cp.hstack([dh_dx[0,0], dh_dx[1,0] ])
+        # print(f"dh_dx:{dh_dx}, dh_dtheta:{dh_dTheta}, dh_dAgent:{dh_dx_agent}")
+
+        return h, dh_dx_agent/(1.0-np.cos(self.FoV_angle/2)), dh_dx_target/(1.0-np.cos(self.FoV_angle/2)) #h_dot_A, h_dot_B
+
+
+    def CBF3_loss_cp_v2(self,x,target):
+        # print(type(x))
+        theta = x[2,0]
+        sin_theta = self.cp_sin(theta)
+        cos_theta = self.cp_cos(theta)
+        # Direction Vector
+        # bearing_vector = np.array([self.cp_cos(theta),self.cp_sin(theta)]) @ (target.X[:,0] - x[0:2,0])/cp.norm(target.X[:,0] - x[0:2,0])
+
+        bearing_vector  = cos_theta * (target.X[0,0] - x[0,0]) + sin_theta * (target.X[1,0] - x[1,0])
+        bearing_vector = bearing_vector/cp.norm(target.X[:,0] - x[0:2,0])
+
+        h = (bearing_vector - np.cos(self.FoV_angle/2))/(1.0-np.cos(self.FoV_angle/2))
+
+        dir_vector = cp.vstack([cos_theta,sin_theta])
+        
+        # p_transpose = np.array([target.X[0,0],target.X[1,0]]) - np.array([x[0,0],x[1,0]])
+        # p = p_transpose.reshape(-1,1)
+        p = cp.vstack([target.X[0,0]-x[0,0], target.X[1,0]-x[1,0] ])
+        norm_p = cp.sqrt( cp.square(p[0]) + cp.square(p[1]) )
+        # x = X_L - X_F
+        #dh_dx = dir_vector/cp.norm(p,2) - ( (dir_vector @ p) * p_transpose )/cp.norm(p)**3   
+        print("1",dir_vector/norm_p)
+        dh_dx = dir_vector/norm_p - ( (dir_vector[0] * p[0,0] + dir_vector[1] * p[1,0]) * p )/cp.power(norm_p,3)
+        print("dhdx",dh_dx.shape)
+            
+        dh_dTheta = ( -sin_theta * p[0,0] + cos_theta * p[1,0] )/cp.norm(p)
+        dh_dx_agent = cp.hstack([-dh_dx[0,0], -dh_dx[1,0], dh_dTheta ])
+        dh_dx_target = cp.hstack([dh_dx[0,0], dh_dx[1,0] ])
+        # print(f"dh_dx:{dh_dx}, dh_dtheta:{dh_dTheta}, dh_dAgent:{dh_dx_agent}")
+
+        return h, dh_dx_agent/(1.0-np.cos(self.FoV_angle/2)), dh_dx_target/(1.0-np.cos(self.FoV_angle/2)) #h_dot_A, h_dot_B
+
+
 
     def CLF_loss(self,target):
         
@@ -232,9 +317,6 @@ class Unicycle2D:
         factor = 2*(np.linalg.norm( self.X[0:2,0] - target.X[:,0] ) - avg_D)/np.linalg.norm( self.X[0:2,0] - target.X[:,0] ) * ( np.array([ self.X[0,0], self.X[1,0] ]) - np.array([target.X[0,0],target.X[1,0]]) )
         dV_dx_agent = [factor[0], factor[1], 0]
         dV_dx_target = -factor
-        
-        # V_dot_B = factor @ self.f[0:2,:] + factor @ self.f_corrected[0:2,:]
-        # V_dot_A = factor @ self.g[0:2,:] + factor @ self.g_corrected[0:2,:]
 
         return V, dV_dx_agent, dV_dx_target #V_dot_A, V_dot_B
 
@@ -290,6 +372,21 @@ class Unicycle2D:
         v = k_v*( distance )*np.cos( error_theta ) - (self.f_corrected[0,0] + self.f_corrected[1,0])/2
         return v, omega #np.array([v,omega])
 
+    def nominal_controller_cp(self,x, target):
+        #simple controller for now: considers estimated disturbance
+        #Define gamma for the Lyapunov function
+        k_omega = 0.0#2.5
+        k_v = 0.5
+
+        theta_d = np.arctan2(target.X[:,0][1]-x[1,0],target.X[:,0][0]-x[0,0])
+        error_theta = self.wrap_angle( theta_d - x[2,0] )
+
+        omega = k_omega*error_theta 
+
+        distance = max(np.linalg.norm( x[0:2,0]-target.X[:,0] ) - 0.3,0)
+        v = k_v*( distance )*np.cos( error_theta ) - (self.f_corrected[0,0] + self.f_corrected[1,0])/2
+        return v, omega #np.array([v,omega])
+
     def compute_reward(self,target):
 
         # Want h positive
@@ -315,6 +412,23 @@ class Unicycle2D:
             # return -1, 0
         
         return barrier, dh_dx_list[self.h_index], h1, h2, h3
+
+    def compute_reward_tensor(self,x,target):
+        targetX = torch.tensor(target.X,dtype=torch.float)
+        diff = targetX[:,0] - x[0:2,0]  # row vector
+
+        # Max distance
+        h1 = (self.max_D**2 - torch.norm( diff )**2)/(self.max_D**2-self.min_D**2)
+
+        # Min distance
+        h2 = (torch.norm( diff )**2 - self.min_D**2)/(self.max_D**2-self.min_D**2)
+
+        # Max angle
+        bearing_vector = torch.tensor( [[torch.cos(x[2,0]), torch.sin(x[2,0])]] , dtype=torch.float,requires_grad=True)
+        bearing_angle = torch.matmul ( bearing_vector , diff ) /torch.norm(diff)
+        h3 = (bearing_angle - np.cos(self.FoV_angle/2))[0]/(1.0-np.cos(self.FoV_angle/2))
+        # reward is minimum reward
+        return torch.minimum(torch.minimum(h1,h2),h3)
 
     def compute_reward_sim(self,Fx,Tx):
         if self.h_index == 0:
