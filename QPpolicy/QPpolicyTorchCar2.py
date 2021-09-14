@@ -89,7 +89,7 @@ class Actor:
         objective = cp.Maximize(u)
         problem = cp.Problem(objective,const)
         assert problem.is_dpp()
-        problem.solve()
+        # problem.solve()
 
         # print(f"h1:{h1.value}, h2:{h2.value}, ah1:{alpha1.value*h1.value}, ah2:{alpha2.value*h2.value}, h1dot:{h1_dot.value}, h2dot:{h2_dot.value}")
 
@@ -99,11 +99,12 @@ class Actor:
 
         solver_args = {
             'verbose': False,
-            'max_iters': 1000000
+            'max_iters': 1000000,
         }
 
         # Solve the QP
-        #  result = problem.solve()
+        # result = problem.solve()
+        # print(f"c1:{h1_dot.value + alpha1.value*h1.value}, c2:{h2_dot.value + alpha2.value*h2.value}, u:{u.value}")
         # print(X, self.alpha1_tch, self.alpha2_tch)
         # alpha1_tch = torch.tensor(alpha1.value, requires_grad=True, dtype=torch.float)
         # alpha2_tch = torch.tensor(alpha2.value, requires_grad=True, dtype=torch.float)
@@ -124,7 +125,10 @@ class Actor:
             h2_ = 1 + c*t - X            
             h2_dot_ = c - solution
 
-            loss1 = h1_dot_ - alpha1_tch*h1_dot_ 
+            loss1 = h1_dot_ + alpha1_tch*h1_ 
+            if loss1.detach().numpy()<-0.01:
+                print("ERROR")
+                # exit()
             loss1.backward(retain_graph=True)            
             grad1 = [self.alpha1_tch[0].grad.detach().numpy()[0]-self.alpha1_grad_sum, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum]
             self.alpha1_grad_sum = self.alpha1_grad_sum + grad1[0]
@@ -133,7 +137,11 @@ class Actor:
             # print("l1 alpha1_tch.grad",alpha1_tch.grad)
             # print("l1 alpha2_tch.grad",alpha2_tch.grad)
             
-            loss2 = h2_dot_ - alpha2_tch*h2_dot_ 
+            loss2 = h2_dot_ + alpha2_tch*h2_ 
+            # print(f"tensor c1:{loss1}, c2:{loss2}, u:{solution}")
+            if loss2.detach().numpy()<-0.01:
+                print("ERROR")
+                # exit()
             loss2.backward(retain_graph=True)
             grad2 = [self.alpha1_tch[0].grad.detach().numpy()[0]-self.alpha1_grad_sum, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum]
             self.alpha1_grad_sum = self.alpha1_grad_sum + grad2[0]
@@ -210,14 +218,14 @@ class Actor:
             h2_ = 1 + c*t - X            
             h2_dot_ = c
 
-            loss1 = h1_dot_ - alpha1_tch*h1_dot_ 
+            loss1 = h1_dot_ + alpha1_tch*h1_ 
             loss1.backward(retain_graph=True)            
             grad1 = [self.alpha1_tch[0].grad.detach().numpy()[0]-self.alpha1_grad_sum, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum]
             self.alpha1_grad_sum = self.alpha1_grad_sum + grad1[0]
             self.alpha2_grad_sum = self.alpha2_grad_sum + grad1[1]
             
 
-            loss2 = h2_dot_ - alpha2_tch*h2_dot_ 
+            loss2 = h2_dot_ + alpha2_tch*h2_ 
             loss2.backward(retain_graph=True)
             grad2 = [self.alpha1_tch[0].grad.detach().numpy()[0]-self.alpha1_grad_sum, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum]
             self.alpha1_grad_sum = self.alpha1_grad_sum + grad2[0]
@@ -299,10 +307,14 @@ class Actor:
         e = cp.Parameter((N,1), value = np.asarray(self.index_tensors[0:-2]).reshape(-1,1))
         grad_e = cp.Parameter((N,2), value = np.asarray(self.index_tensor_grads[0:-2]))
 
-        print("product", grad_e @ d)
-        print("org", e.value>=0.1)
+        # print("product", grad_e.shape)
+        # print("s2",d.shape)
+        st = e.value>=-0.01
+        if [False] in st:
+            print (st)
+        # print("org", e.value>=-0.01)
 
-        const = [e + grad_e @ d >= 0]
+        const = [e + grad_e @ d >= -0.01]
         const += [cp.abs(d[0,0])<= 100]
         const += [cp.abs(d[1,0])<=100]
 
@@ -318,11 +330,15 @@ class Actor:
         objective = cp.Maximize(d.T @ d_infeasible)
         problem = cp.Problem(objective, const)
         problem.solve()
+        if problem.status!='optimal':
+            return False, 
         # print(f"direction: {d.T.value}, infeasible's:{d_infeasible.T.value}")
         # print( (d.T @ d_infeasible).value )
 
         self.alpha1_nominal = self.alpha1_nominal + self.beta*d.value[0,0]
         self.alpha2_nominal = self.alpha2_nominal + self.beta*d.value[1,0]
+
+        return True
 
 
 def train(args):
@@ -409,12 +425,14 @@ def train(args):
             break
         else:
             # Update parameter feasibility
-            sum_reward = actor.updateParameterFeasibility(rewards, indexes)
+            success = actor.updateParameterFeasibility(rewards, indexes)
+            if not success:
+                break
             parameters.append([actor.alpha1_nominal, actor.alpha2_nominal])
             actor.resetParams()
        
         # sum_reward = actor.updateParameters(rewards)
-        episode_rewards.append(sum_reward)
+        # episode_rewards.append(sum_reward)
 
     print("Parameters ", parameters)
     print("horizons", ftime)
@@ -431,7 +449,7 @@ parser.add_argument('--plot_freq', type=float, default=1, metavar='G',help='plot
 parser.add_argument('--batch-size', type=int, default=10, metavar='N', help='batch size (default: 256)') #100
 parser.add_argument('--buffer-capacity', type=int, default=20, metavar='N', help='buffer_capacity') #10
 parser.add_argument('--max-steps', type=int, default=200, metavar='N',help='maximum number of steps of each episode') #70
-parser.add_argument('--total-episodes', type=int, default=200, metavar='N',help='total training episodes') #1000
+parser.add_argument('--total-episodes', type=int, default=20, metavar='N',help='total training episodes') #1000
 parser.add_argument('--policy-freq', type=int, default=500, metavar='N',help='update frequency of target network ')
 parser.add_argument('--start-timestep', type=int, default=10000, metavar='N',help='number of steps using random policy')
 parser.add_argument('--horizon', type=int, default=500, metavar='N',help='RL time horizon') #3

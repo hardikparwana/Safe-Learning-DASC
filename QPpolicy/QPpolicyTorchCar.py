@@ -299,8 +299,8 @@ class Actor:
         e = cp.Parameter((N,1), value = np.asarray(self.index_tensors[0:-2]).reshape(-1,1))
         grad_e = cp.Parameter((N,2), value = np.asarray(self.index_tensor_grads[0:-2]))
 
-        # print("product", grad_e @ d)
-        # print("org", e.value>=0)
+        print("product", grad_e @ d)
+        print("org", e.value>=0)
         const = [e + grad_e @ d >= 0]
         const += [cp.abs(d[0,0])<= 100]
         const += [cp.abs(d[1,0])<=100]
