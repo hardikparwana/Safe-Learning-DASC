@@ -22,7 +22,7 @@ class torch_dynamics(torch.autograd.Function):
         # save tensors for use in backward computation later on
         ctx.save_for_backward(x,u, gx, df_dx, dgxu_dx)
         # print(f"fx:{fx}, gx:{gx}, u:{u}")
-        return fx + torch.matmul(gx, u)
+        return fx + gx * u
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -34,16 +34,16 @@ class torch_dynamics(torch.autograd.Function):
         x = input_x.detach().numpy()
         u = input_u.detach().numpy()
 
-        n_x = np.shape(x)[0]
-        n_u = np.shape(u)[0]
+        n_x = np.shape(x)
+        n_u = np.shape(u)
                
         # print(grad_output)
         
         gradient_x = df_dx + dgxu_dx
         gradient_u =  gx 
 
-        output_grad_x = torch.reshape(torch.matmul(torch.transpose(grad_output,0,1),gradient_x),(n_x,1))
-        output_grad_u = torch.reshape(torch.matmul(torch.transpose(grad_output,0,1),gradient_u),(n_u,1))
+        output_grad_x = grad_output *gradient_x
+        output_grad_u = grad_output *gradient_u
 
         return output_grad_x, output_grad_u
 

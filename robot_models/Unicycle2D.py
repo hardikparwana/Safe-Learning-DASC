@@ -10,9 +10,9 @@ def fx_(x):
     # return torch.tensor(np.array([0.0,0.0,0.0]).reshape(-1,1)*dt,dtype=torch.float)
 
 def gx_(x):
-    x_ = x.detach().numpy()
-    g_ = np.array([ [np.cos(x[2,0]),0.0],[np.sin(x[2,0]),0.0],[0,1] ])*dt
-    return torch.tensor(g_,dtype=torch.float)
+    # x_ = x.detach().numpy()
+    g_ = torch.tensor([ [torch.cos(x[2,0]),0.0],[torch.sin(x[2,0]),0.0],[0,1] ])*dt
+    return g_ #torch.tensor(g_,dtype=torch.float)
 
 def df_dx_(x, type = 'tensor'):
     dfdx = np.eye(3) + np.array([[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0]])*dt
@@ -22,12 +22,14 @@ def df_dx_(x, type = 'tensor'):
         return torch.tensor(dfdx,dtype=torch.float)
     
 def dgxu_dx_(x, u, type='tensor'):
-    u_ = u.detach().numpy()
-    dgxudx = np.array([[0.0, 0.0, -u[0,0]*np.sin(x[2,0]) ],[0.0, 0.0, u[0,0]*np.cos(x[2,0])],[ 0.0,0.0,0.0 ]])*dt
+    # print(u)
+    # u_ = u.detach().numpy()
+    # dgxudx = np.array([[0.0, 0.0, -u[0,0]*np.sin(x[2,0]) ],[0.0, 0.0, u[0,0]*np.cos(x[2,0])],[ 0.0,0.0,0.0 ]])*dt
+    dgxudx = torch.tensor([[0.0, 0.0, -u[0,0]*torch.sin(x[2,0]) ],[0.0, 0.0, u[0,0]*torch.cos(x[2,0])],[ 0.0,0.0,0.0 ]])*dt
     if type == 'numpy':
-        return dgxudx
+        return dgxudx.detach().numpy()
     if type == 'tensor':
-        return torch.tensor(dgxudx,dtype=torch.float)
+        return dgxudx
 
 class Unicycle2D:
     
@@ -68,6 +70,13 @@ class Unicycle2D:
     
         self.X[2,0] = self.wrap_angle(self.X[2,0])
         return self.X
+
+    def fx(self,x):
+        return torch.tensor(np.array([0.0,0.0,0.0]).reshape(-1,1)*dt,dtype=torch.float)
+    # return torch.tensor(np.array([0.0,0.0,0.0]).reshape(-1,1)*dt,dtype=torch.float)
+
+    def gx(self,x):
+        return torch.tensor([ [torch.cos(x[2,0]),0.0],[torch.sin(x[2,0]),0.0],[0,1] ])
 
     def step_sim(self,U):
         
@@ -130,6 +139,10 @@ class Unicycle2D:
     def xdot_cp(self,x,U):
         # print("g",self.g + self.g_corrected)
         return ( self.f + self.g @ U )
+
+    def xdot_tensor(self,x,U):
+        # print("g",self.g + self.g_corrected)
+        return ( self.f + self.g @ U )
     
     def CBF_loss(self,target,u,w):
 
@@ -153,7 +166,7 @@ class Unicycle2D:
         h = self.max_D**2 - np.linalg.norm( self.X[0:2,0] - target.X[:,0] )**2
         dh_dx_agent = np.append(- 2*( self.X[0:2,0] - target.X[:,0] ),0)
         dh_dx_target = 2*( self.X[0:2,0] - target.X[:,0] )
-        
+        # print(f"1: {self.max_D}, x:{self.X}, tX:{target.X}, {np.linalg.norm( self.X[0:2,0] - target.X[:,0] )}, diff:{self.X[0:2,0] - target.X[:,0]}")
         return h, dh_dx_agent, dh_dx_target  #h_dot_A, h_dot_B
 
     def CBF1_loss_cp(self, x, target):
@@ -163,6 +176,17 @@ class Unicycle2D:
         dh_dx_target = cp.hstack( [2*( x[0,0] - target.X[0,0] ), 2*( x[1,0] - target.X[1,0] )] )
         
         return h, dh_dx_agent, dh_dx_target  #h_dot_A, h_dot_B
+
+    def CBF1_loss_tensor(self, x, target):
+        targetX = torch.tensor(target.X,dtype=torch.float)
+
+        # print("1loss ",torch.square(torch.norm( x[0:2] - targetX )))
+        h = self.max_D**2 - torch.reshape(torch.square(torch.norm( x[0:2] - targetX )),(1,1))
+        dh_dx_agent = torch.cat( ( -2*( x[0:2] - targetX ), torch.tensor([[0.0]]) ), 0).T
+        dh_dx_target =  2*( x[0:2] - targetX).T
+        # print(f"1: {self.max_D}, x:{x}, tX:{targetX}, {torch.norm( x[0:2,0] - targetX )}, diff:{x[0:2] - targetX}, diff2:{x[0:2,0] - targetX[:,0]}")
+        
+        return h, dh_dx_agent @ self.fx(x), dh_dx_agent @ self.gx(x), dh_dx_target  #h_dot_A, h_dot_B
 
     def CBF1_sim_loss(self,Fx,Tx):
         h = self.max_D**2 - np.linalg.norm( Fx[0:2,0] - Tx[:,0] )**2
@@ -184,11 +208,12 @@ class Unicycle2D:
         return h, dh_dx_agent, dh_dx_target #h_dot_A, h_dot_B
 
     def CBF2_loss_tensor(self, x, target):
-        h = cp.square(cp.norm( x[0:2,0] - target.X[:,0] )) - self.min_D**2
-        dh_dx_agent = cp.hstack([ 2*( x[0,0] - target.X[0,0] ), 2*( x[0,0] - target.X[0,0] ), 0]) 
-        dh_dx_target = cp.hstack([- 2*( x[0,0] - target.X[0,0]), - 2*( x[1,0] - target.X[1,0]) ])
+        targetX = torch.tensor(target.X,dtype=torch.float)
+        h = torch.reshape(torch.square(torch.norm( x[0:2] - targetX )),(1,1)) - self.min_D**2
+        dh_dx_agent = torch.cat( ( 2*( x[0:2] - targetX ), torch.tensor([[0.0]]) ), 0).T
+        dh_dx_target = - 2*( x[0:2] - targetX).T
 
-        return h, dh_dx_agent, dh_dx_target #h_dot_A, h_dot_B
+        return h, dh_dx_agent @ self.fx(x), dh_dx_agent @ self.gx(x), dh_dx_target #h_dot_A, h_dot_B
 
     def CBF2_sim_loss(self,Fx,Tx):
         h = np.linalg.norm( Fx[0:2,0] - Tx[:,0] )**2 - self.min_D**2
@@ -273,6 +298,23 @@ class Unicycle2D:
 
         return h, dh_dx_agent/(1.0-np.cos(self.FoV_angle/2)), dh_dx_target/(1.0-np.cos(self.FoV_angle/2)) #h_dot_A, h_dot_B
 
+    def CBF3_loss_tensor(self,x,target):
+           
+        targetX = torch.tensor(target.X,dtype=torch.float)
+        p = targetX - x[0:2]
+
+        dir_vector = torch.tensor([[torch.cos(x[2,0])],[torch.sin(x[2,0])]]) # column vector
+        bearing_angle  = torch.matmul(dir_vector.T , p )/ torch.norm(p)
+        h = (bearing_angle - np.cos(self.FoV_angle/2))/(1.0-np.cos(self.FoV_angle/2))
+
+        norm_p = torch.norm(p)
+        dh_dx = dir_vector/norm_p - ( ( torch.matmul(dir_vector.T , p) ) * p )/torch.pow(norm_p,3)    
+        dh_dTheta = torch.reshape( ( -torch.sin(x[2]) * p[0] + torch.cos(x[2]) * p[1] ),(1,1) )/torch.norm(p)
+        dh_dx_agent = torch.cat(  ( -dh_dx , dh_dTheta),0  ).T
+        dh_dx_target = dh_dx.T
+
+        return h, dh_dx_agent/(1.0-np.cos(self.FoV_angle/2)) @ self.fx(x), dh_dx_agent/(1.0-np.cos(self.FoV_angle/2)) @ self.gx(x), dh_dx_target/(1.0-np.cos(self.FoV_angle/2)) #h_dot_A, h_dot_B
+
 
     def CBF3_loss_cp_v2(self,x,target):
         # print(type(x))
@@ -319,6 +361,19 @@ class Unicycle2D:
         dV_dx_target = -factor
 
         return V, dV_dx_agent, dV_dx_target #V_dot_A, V_dot_B
+
+    def CLF_loss_tensor(self,x,target):
+        
+        targetX = torch.tensor(target.X,dtype=torch.float)
+        avg_D = (self.min_D + self.max_D)/2.0
+        V = torch.reshape(torch.pow(torch.norm(targetX)- avg_D,2),(1,1))
+
+        p = targetX - x[0:2]
+        factor = 2*(torch.norm( p ) - avg_D)/torch.norm(p) * ( -p )
+        dV_dx_agent = torch.cat( ( factor , torch.tensor([[0]]))  , 0 ).T
+        dV_dx_target = -factor.T
+
+        return V, dV_dx_agent @ self.fx(x), dV_dx_agent @ self.gx(x), dV_dx_target 
 
     def nominal_controller_old(self,target):
         #simple controller for now: does not consider disturbance
@@ -422,7 +477,7 @@ class Unicycle2D:
 
         # Min distance
         h2 = (torch.norm( diff )**2 - self.min_D**2)/(self.max_D**2-self.min_D**2)
-
+        # print(f"reward x:{x}, shape:{x.shape}")
         # Max angle
         bearing_vector = torch.tensor( [[torch.cos(x[2,0]), torch.sin(x[2,0])]] , dtype=torch.float,requires_grad=True)
         bearing_angle = torch.matmul ( bearing_vector , diff ) /torch.norm(diff)

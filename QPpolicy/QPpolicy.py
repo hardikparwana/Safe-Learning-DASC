@@ -119,14 +119,15 @@ class Actor:
         const += [delta>=0]
 
         epsilon = 0.9
-        # CBF constraints
+        # CBF constraints'
+        print(dh1_dxA @ agent.xdot(x), dh1_dxB)
         const += [dh1_dxA @ agent.xdot(x) + dh1_dxB @ target.xdot(target.U) >= -alpha*h1 + 0.2]#np.linalg.norm(dh1_dxA @ (agent.g+ agent.g_corrected))/epsilon]
         const += [dh2_dxA @ agent.xdot(x) + dh2_dxB @ target.xdot(target.U) >= -alpha*h2 + 0.2]#np.linalg.norm(dh2_dxA @ (agent.g+ agent.g_corrected))/epsilon]
         const += [dh3_dxA @ agent.xdot(x) + dh3_dxB @ target.xdot(target.U) >= -alpha*h3 + 0.2]#np.linalg.norm(dh3_dxA @ (agent.g+ agent.g_corrected))/epsilon]
         # const += [alpha >= -20]
         problem = cp.Problem(objective,const)
         assert problem.is_dpp()
-
+        # exit()
         cvxpylayer = CvxpyLayer(problem, parameters=[alpha, k], variables=[x])
         alpha_tch = torch.tensor(alpha.value, requires_grad=True, dtype=torch.float)
         k_tch = torch.tensor(k.value, requires_grad=True, dtype=torch.float)
@@ -230,13 +231,18 @@ class Actor:
 
         epsilon = 0.9
         # CBF constraints
+        # print("A",dV_dxA @ agent.xdot(x))
+        # print("B",dV_dxB)
+        # print("ah",k.value*V)
+        # print(agent.X,target.X)
+        # print("alpha",self.k_nominal)
         const += [dh1_dxA @ agent.xdot(x) + dh1_dxB @ target.xdot(target.U) >= -alpha1*h1 ]#np.linalg.norm(dh1_dxA @ (agent.g+ agent.g_corrected))/epsilon]
         const += [dh2_dxA @ agent.xdot(x) + dh2_dxB @ target.xdot(target.U) >= -alpha2*h2 ]#np.linalg.norm(dh2_dxA @ (agent.g+ agent.g_corrected))/epsilon]
         const += [dh3_dxA @ agent.xdot(x) + dh3_dxB @ target.xdot(target.U) >= -alpha3*h3 ]#np.linalg.norm(dh3_dxA @ (agent.g+ agent.g_corrected))/epsilon]
         # const += [alpha >= -20]
         problem = cp.Problem(objective,const)
         assert problem.is_dpp()
-
+        # exit()
         cvxpylayer = CvxpyLayer(problem, parameters=[alpha1, alpha2, alpha3, k], variables=[x])
         alpha1_tch = torch.tensor(alpha1.value, requires_grad=True, dtype=torch.float)
         alpha2_tch = torch.tensor(alpha2.value, requires_grad=True, dtype=torch.float)
@@ -449,7 +455,7 @@ class policy_learning_agent:
             self.actor.alpha3_nominal = 0
         if self.actor.k_nominal < 0:
             self.actor.k_nominal = 0
-        # print(f"policy_gradient:{policy_gradient}, alpha1_nom:{self.actor.alpha_nominal}, alpha2_nom:{self.actor.alpha2_nominal}, alpha3_nom:{self.actor.alpha3_nominal} k_nominal:{self.actor.k_nominal}")
+        print(f"policy_gradient:{policy_gradient}, alpha1_nom:{self.actor.alpha_nominal}, alpha2_nom:{self.actor.alpha2_nominal}, alpha3_nom:{self.actor.alpha3_nominal} k_nominal:{self.actor.k_nominal}")
 
     def policy(self,follower,target):
         solved, U, param_grad, delta = self.actor.policy(follower,target)
@@ -507,7 +513,7 @@ def train(args):
             min_action=min_action)
         
         agentF = Unicycle2D(np.array([0,0.2,0]),dt,3,FoV,max_D,min_D)
-        agentT = SingleIntegrator(np.array([1,0]),dt)
+        agentT = SingleIntegrator(np.array([1,0]),dt,ax,0)
 
         TX_prev = agentT.X
         FX_prev = agentF.X
@@ -752,7 +758,7 @@ parser.add_argument('--movie', type=float, default=True, metavar='G',help='CLF p
 parser.add_argument('--movie_name', default="test.mp4")
 args = parser.parse_args("")
 
-Alphas = [0.0] #0.15 #0.115
+Alphas = [0.15]#[0.0] #0.15 #0.115
 Ks = [0.1] #0.1 #2.0
 Trains = [True, False]
 # Betas = [-0.5,-0.2, -0.05, -0.03, 0, 0.03, 0.05, 0.2, 0.5]
