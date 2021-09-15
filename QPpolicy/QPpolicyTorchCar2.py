@@ -372,7 +372,7 @@ def train(args):
     for ep in range(args.total_episodes):
 
         # Initialize tensor list
-        agentF = SingleIntegrator1D(np.array([0.5]),dt)
+        agentF = SingleIntegrator1D(np.array([0.1]),dt)
         state_tensors = [torch.tensor(agentF.X,dtype=torch.float,requires_grad=True)]
         input_tensors = []
         rewards = []        
@@ -454,8 +454,8 @@ parser.add_argument('--policy-freq', type=int, default=500, metavar='N',help='up
 parser.add_argument('--start-timestep', type=int, default=10000, metavar='N',help='number of steps using random policy')
 parser.add_argument('--horizon', type=int, default=500, metavar='N',help='RL time horizon') #3
 parser.add_argument('--alpha', type=float, default=3, metavar='G',help='CBF parameter')  #0.003
-parser.add_argument('--alpha1', type=float, default=0.5, metavar='G',help='CBF parameter')  #0.003
-parser.add_argument('--alpha2', type=float, default=2.0, metavar='G',help='CBF parameter')  #0.003
+parser.add_argument('--alpha1', type=float, default=1.0, metavar='G',help='CBF parameter')  #0.003
+parser.add_argument('--alpha2', type=float, default=0.7, metavar='G',help='CBF parameter')  #0.003
 parser.add_argument('--k', type=float, default=0.1, metavar='G',help='CLF parameter')  #0.003
 parser.add_argument('--train', type=float, default=True, metavar='G',help='CLF parameter')  #0.003
 parser.add_argument('--movie', type=float, default=True, metavar='G',help='CLF parameter')  #0.003
@@ -466,8 +466,18 @@ args = parser.parse_args("")
 
 train(args)
 
-alpha1 = [3.0, 1.0, 0.5]
-alpha2 = [1.0, 4.0, 2.0]
-beta = [0.08, 0.1]
-times = [[91,91,90,feasible],
-        [62,62,62,62,62]]
+# alpha1 = [0.5, 1.0]
+# alpha2 = [2.0, 0.7]
+# beta = [0.09, 0.09]
+# x0 = [0.5, 0.1]
+# times = [[91,91,90,feasible],
+#         [62,62,62,62,62]]
+
+## 1
+# Parameters  [[0.5, 2.0], [9.499999999846747, 10.999999987836684], [18.49999999984461, 19.999998889873122], [18.42787332391092, 17.639299205910824], [18.36243444076898, 15.33065325435945], [18.302230686161163, 13.093195195776916], [27.302230676319347, 8.579902414629874], [36.30223067602463, 17.579901677740462], [45.30223067586486, 8.579931977331668], [54.3022306741145, 17.579930776067556], [63.30223067378059, 8.58004620082988], [72.30223067304625, 17.580046063850176], [81.30223067283777, 8.580051907312903], [90.30223067268147, 17.58005188171561], [99.30223067267612, 8.580052300252564], [108.3022306726396, 17.58005229461842], [103.42754785417571, 15.41472526543917], [112.42754785286994, 9.72261233032273], [121.42754785280107, 18.722612153453323], [120.86499303772686, 14.783796128175496], [120.35351426987512, 11.621664105323099]]
+# horizons [40, 133, 138, 138, 138, 138, 140, 141, 141, 142, 142, 142, 142, 142, 142, 142, 142, 142, 143, 143]
+
+
+## 2
+# Parameters  [[1.0, 0.7], [9.99999999571605, 9.699999998225072], [18.99999999501734, 18.699981054438645], [27.99999996366376, 17.903607449178125], [28.029842057819, 16.563468908796786], [37.02984205632739, 15.490884732041954], [46.029842055498435, 14.378700167182327], [55.02984204770548, 13.086541854165926], [64.02984202905188, 11.644320067188632], [73.02984202903579, 20.644318808398104], [82.02984202891692, 17.12511135611632], [79.42912212447023, 16.166849884560296], [77.09769004466793, 15.294769834677268], [86.09769004446883, 12.216287310816039], [95.09769002219518, 11.132267666672282], [104.09769002190582, 20.132171388136793], [113.09769001987456, 18.78821192851618], [122.09769001986186, 15.035300669559938], [121.45808676417046, 14.26824494580404], [120.87607982266637, 13.564244804832063], [120.35947462802488, 12.930180307798828]]
+# horizons [6, 133, 138, 140, 140, 141, 141, 142, 142, 142, 142, 142, 142, 142, 142, 142, 142, 143, 143, 143]

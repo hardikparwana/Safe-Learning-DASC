@@ -89,7 +89,7 @@ class Actor:
         objective = cp.Maximize(u)
         problem = cp.Problem(objective,const)
         assert problem.is_dpp()
-        problem.solve()
+        # problem.solve()
 
         # print(f"h1:{h1.value}, h2:{h2.value}, ah1:{alpha1.value*h1.value}, ah2:{alpha2.value*h2.value}, h1dot:{h1_dot.value}, h2dot:{h2_dot.value}")
 
@@ -99,11 +99,12 @@ class Actor:
 
         solver_args = {
             'verbose': False,
-            'max_iters': 1000000
+            'max_iters': 1000000,
         }
 
         # Solve the QP
-        #  result = problem.solve()
+        # result = problem.solve()
+        # print(f"c1:{h1_dot.value + alpha1.value*h1.value}, c2:{h2_dot.value + alpha2.value*h2.value}, u:{u.value}")
         # print(X, self.alpha1_tch, self.alpha2_tch)
         # alpha1_tch = torch.tensor(alpha1.value, requires_grad=True, dtype=torch.float)
         # alpha2_tch = torch.tensor(alpha2.value, requires_grad=True, dtype=torch.float)
@@ -124,7 +125,10 @@ class Actor:
             h2_ = 1 + c*t - X            
             h2_dot_ = c - solution
 
-            loss1 = h1_dot_ - alpha1_tch*h1_dot_ 
+            loss1 = h1_dot_ + alpha1_tch*h1_ 
+            if loss1.detach().numpy()<-0.01:
+                print("ERROR")
+                # exit()
             loss1.backward(retain_graph=True)            
             grad1 = [self.alpha1_tch[0].grad.detach().numpy()[0]-self.alpha1_grad_sum, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum]
             self.alpha1_grad_sum = self.alpha1_grad_sum + grad1[0]
@@ -133,7 +137,11 @@ class Actor:
             # print("l1 alpha1_tch.grad",alpha1_tch.grad)
             # print("l1 alpha2_tch.grad",alpha2_tch.grad)
             
-            loss2 = h2_dot_ - alpha2_tch*h2_dot_ 
+            loss2 = h2_dot_ + alpha2_tch*h2_ 
+            # print(f"tensor c1:{loss1}, c2:{loss2}, u:{solution}")
+            if loss2.detach().numpy()<-0.01:
+                print("ERROR")
+                # exit()
             loss2.backward(retain_graph=True)
             grad2 = [self.alpha1_tch[0].grad.detach().numpy()[0]-self.alpha1_grad_sum, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum]
             self.alpha1_grad_sum = self.alpha1_grad_sum + grad2[0]
@@ -210,14 +218,14 @@ class Actor:
             h2_ = 1 + c*t - X            
             h2_dot_ = c
 
-            loss1 = h1_dot_ - alpha1_tch*h1_dot_ 
+            loss1 = h1_dot_ + alpha1_tch*h1_ 
             loss1.backward(retain_graph=True)            
             grad1 = [self.alpha1_tch[0].grad.detach().numpy()[0]-self.alpha1_grad_sum, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum]
             self.alpha1_grad_sum = self.alpha1_grad_sum + grad1[0]
             self.alpha2_grad_sum = self.alpha2_grad_sum + grad1[1]
             
 
-            loss2 = h2_dot_ - alpha2_tch*h2_dot_ 
+            loss2 = h2_dot_ + alpha2_tch*h2_ 
             loss2.backward(retain_graph=True)
             grad2 = [self.alpha1_tch[0].grad.detach().numpy()[0]-self.alpha1_grad_sum, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum]
             self.alpha1_grad_sum = self.alpha1_grad_sum + grad2[0]
@@ -299,9 +307,14 @@ class Actor:
         e = cp.Parameter((N,1), value = np.asarray(self.index_tensors[0:-2]).reshape(-1,1))
         grad_e = cp.Parameter((N,2), value = np.asarray(self.index_tensor_grads[0:-2]))
 
-        print("product", grad_e @ d)
-        print("org", e.value>=0)
-        const = [e + grad_e @ d >= 0]
+        # print("product", grad_e.shape)
+        # print("s2",d.shape)
+        st = e.value>=-0.01
+        if [False] in st:
+            print (st)
+        # print("org", e.value>=-0.01)
+
+        const = [e + grad_e @ d >= -0.01]
         const += [cp.abs(d[0,0])<= 100]
         const += [cp.abs(d[1,0])<=100]
 
@@ -318,12 +331,14 @@ class Actor:
         problem = cp.Problem(objective, const)
         problem.solve()
         if problem.status!='optimal':
-            print("Could not find a feasible direction")
+            return False, 
         # print(f"direction: {d.T.value}, infeasible's:{d_infeasible.T.value}")
         # print( (d.T @ d_infeasible).value )
 
         self.alpha1_nominal = self.alpha1_nominal + self.beta*d.value[0,0]
         self.alpha2_nominal = self.alpha2_nominal + self.beta*d.value[1,0]
+
+        return True
 
 
 def train(args):
@@ -357,7 +372,7 @@ def train(args):
     for ep in range(args.total_episodes):
 
         # Initialize tensor list
-        agentF = SingleIntegrator1D(np.array([0.5]),dt)
+        agentF = SingleIntegrator1D(np.array([0.1]),dt)
         state_tensors = [torch.tensor(agentF.X,dtype=torch.float,requires_grad=True)]
         input_tensors = []
         rewards = []        
@@ -410,12 +425,14 @@ def train(args):
             break
         else:
             # Update parameter feasibility
-            sum_reward = actor.updateParameterFeasibility(rewards, indexes)
+            success = actor.updateParameterFeasibility(rewards, indexes)
+            if not success:
+                break
             parameters.append([actor.alpha1_nominal, actor.alpha2_nominal])
             actor.resetParams()
        
         # sum_reward = actor.updateParameters(rewards)
-        episode_rewards.append(sum_reward)
+        # episode_rewards.append(sum_reward)
 
     print("Parameters ", parameters)
     print("horizons", ftime)
@@ -426,19 +443,19 @@ def train(args):
 parser = argparse.ArgumentParser(description='td3')
 parser.add_argument('--env-name', default="UnicycleFollower")
 parser.add_argument('--gamma', type=float, default=0.99,metavar='G',help='discounted factor')
-parser.add_argument('--lr_actor', type=float, default=0.09, metavar='G',help='learning rate of actor')  #0.003
+parser.add_argument('--lr_actor', type=float, default=0.01, metavar='G',help='learning rate of actor')  #0.003
 parser.add_argument('--lr-critic', type=float, default=0.03, metavar='G',help='learning rate of critic') #0.003
 parser.add_argument('--plot_freq', type=float, default=1, metavar='G',help='plotting frequency')
 parser.add_argument('--batch-size', type=int, default=10, metavar='N', help='batch size (default: 256)') #100
 parser.add_argument('--buffer-capacity', type=int, default=20, metavar='N', help='buffer_capacity') #10
 parser.add_argument('--max-steps', type=int, default=200, metavar='N',help='maximum number of steps of each episode') #70
-parser.add_argument('--total-episodes', type=int, default=200, metavar='N',help='total training episodes') #1000
+parser.add_argument('--total-episodes', type=int, default=20, metavar='N',help='total training episodes') #1000
 parser.add_argument('--policy-freq', type=int, default=500, metavar='N',help='update frequency of target network ')
 parser.add_argument('--start-timestep', type=int, default=10000, metavar='N',help='number of steps using random policy')
 parser.add_argument('--horizon', type=int, default=500, metavar='N',help='RL time horizon') #3
 parser.add_argument('--alpha', type=float, default=3, metavar='G',help='CBF parameter')  #0.003
-parser.add_argument('--alpha1', type=float, default=1., metavar='G',help='CBF parameter')  #0.003
-parser.add_argument('--alpha2', type=float, default=4.0, metavar='G',help='CBF parameter')  #0.003
+parser.add_argument('--alpha1', type=float, default=0.2, metavar='G',help='CBF parameter')  #0.003
+parser.add_argument('--alpha2', type=float, default=4.5, metavar='G',help='CBF parameter')  #0.003
 parser.add_argument('--k', type=float, default=0.1, metavar='G',help='CLF parameter')  #0.003
 parser.add_argument('--train', type=float, default=True, metavar='G',help='CLF parameter')  #0.003
 parser.add_argument('--movie', type=float, default=True, metavar='G',help='CLF parameter')  #0.003
@@ -446,11 +463,21 @@ parser.add_argument('--movie_name', default="test.mp4")
 parser.add_argument('--dt', type=float, default="0.01")
 args = parser.parse_args("")
 
-
 train(args)
 
-alpha1 = [3.0, 1.0]
-alpha2 = [1.0, 4.0]
-beta = [0.08, 0.1]
-times = [[91,91,90,feasible],
-        [62,62,62,62,62]]
+# alpha1 = [3.0, 0.2]
+# alpha2 = [1.0, 4.5]
+# x0 = [0.5, 0.1]
+# beta = [0.01, 0.01]
+# times = [[91,91,90,feasible],
+#         [62,62,62,62,62]]
+
+
+## Case 1
+# Parameters  [[3.0, 1.0], [2.171817112678339, 1.999999997295347], [3.149193806179822, 0.9999999973420672], [4.149193804906375, 1.9999999973167402], [5.149193804670515, 2.999999997309681], [6.14919380452549, 3.9999999972005984], [7.1491938043940415, 4.9999999965909145], [8.149193804169093, 5.9999999921789255], [9.149193804161591, 6.99999998978608], [10.149193800134931, 7.9999996582562485], [11.149193800057962, 8.999999357340316], [12.149193799161653, 9.999994256402568], [13.149193799160955, 10.99998953919495], [14.149193799157668, 11.999989268083645], [15.149193799155823, 12.999928299894096], [15.146057142741926, 12.78926971117735], [16.146057141765187, 12.17628006653447], [16.876982002935126, 11.17634584747435], [17.876982002934653, 12.176344966640798], [18.615299787980533, 11.176394448885873], [19.615299787980153, 12.176394299293307]]
+# horizons [91, 97, 92, 116, 123, 127, 129, 131, 132, 134, 134, 135, 136, 136, 137, 137, 137, 137, 138, 138]
+
+
+## Case 2
+# Parameters  [[0.2, 4.5], [1.1999999999843958, 5.499999997749792], [2.199999999966882, 6.49999999656648], [3.1999993428084377, 6.329111179965787], [4.1999993427987325, 7.329111178175456], [5.199993037924893, 7.147709657262412], [6.199991681206735, 6.967010488329249], [7.199990710225937, 6.787007164091134], [8.199990710126746, 7.787007124088467], [9.199990709824057, 8.78700687050283], [10.199990709490926, 9.786998399741117], [11.199990709489308, 10.78699801326706], [12.199990709488205, 11.78698996358571], [13.199990709487812, 12.786989808532189], [13.199990709487812, 12.786989808532189], [13.199990709487812, 12.786989808532189], [13.199990709487812, 12.786989808532189], [13.199990709487812, 12.786989808532189], [13.199990709487812, 12.786989808532189], [13.199990709487812, 12.786989808532189], [13.199990709487812, 12.786989808532189]]
+# horizons [43, 69, 98, 112, 120, 124, 127, 129, 131, 132, 134, 134, 135, 136, 136, 136, 136, 136, 136, 136]
