@@ -455,7 +455,7 @@ class policy_learning_agent:
             self.actor.alpha3_nominal = 0
         if self.actor.k_nominal < 0:
             self.actor.k_nominal = 0
-        print(f"policy_gradient:{policy_gradient}, alpha1_nom:{self.actor.alpha_nominal}, alpha2_nom:{self.actor.alpha2_nominal}, alpha3_nom:{self.actor.alpha3_nominal} k_nominal:{self.actor.k_nominal}")
+        # print(f"policy_gradient:{policy_gradient}, alpha1_nom:{self.actor.alpha_nominal}, alpha2_nom:{self.actor.alpha2_nominal}, alpha3_nom:{self.actor.alpha3_nominal} k_nominal:{self.actor.k_nominal}")
 
     def policy(self,follower,target):
         solved, U, param_grad, delta = self.actor.policy(follower,target)
@@ -587,8 +587,11 @@ def train(args):
                 # uL = 0.1
                 # vL = 0.2*np.sin(np.pi*t/5) #  0.1
 
-                uL = 0.5
-                vL = 2.6*np.sin(np.pi*t) #  0.1 # 1.2
+                # uL = 0.5
+                # vL = 2.6*np.sin(np.pi*t) #  0.1 # 1.2
+
+                uL = 1.0
+                vL = 12*np.sin(np.pi*t*4) #  0.1 # 1.2
 
                 # Exploration vs Exploitation
                 rand_sample = np.random.random()
@@ -763,7 +766,8 @@ Ks = [0.1] #0.1 #2.0
 Trains = [True, False]
 # Betas = [-0.5,-0.2, -0.05, -0.03, 0, 0.03, 0.05, 0.2, 0.5]
 # Betas = [0.4, 0]
-Betas = [0.4]
+Betas = [0.8, 0.0]
+# Betas = [0.2, 0.4, 0.6, 0.8]
 movie_names = ['Adaptive.mp4','Non-Adaptive.mp4']
 
 reward_episodes = []
@@ -816,12 +820,16 @@ for Alpha in Alphas:
 
             # axis2[1].plot(t_plot,deltas,c = 'r',label='slack')
 
+            if index == 0:
+                mark = '--'
+            if index == 1:
+                mark = '.'
             # Barrier Function Plots
-            axis3.plot(t_plot,h1s,colors[index],label = 'h1 '+ name)
+            axis3.plot(t_plot,h1s,('g' + mark),label = 'h1 '+ name)
             # style = colors[index]+'.'
             # print(style)
-            axis3.plot(t_plot,h2s,(colors[index]+'.'),label = 'h2 ' + name)
-            axis3.plot(t_plot,h3s,(colors[index]+'--'),label = 'h3 ' + name)
+            axis3.plot(t_plot,h2s,('b'+mark),label = 'h2 ' + name)
+            axis3.plot(t_plot,h3s,('k'+mark),label = 'h3 ' + name)
 
             # Target Movement Plot
             axis4[0].plot(t_plot,[x[0] for x in TXs],c = 'r',label='X')
@@ -835,6 +843,13 @@ for Alpha in Alphas:
 
 plt.ioff()
 
+import matplotlib 
+font = {'family' : 'normal',
+        'weight' : 'normal',
+        'size'   : 14}
+
+matplotlib.rc('font', **font)
+
 # Parameter Plot
 axis1[0,0].set_title(r"$\alpha_1 $")
 axis1[1,0].set_title(r"$\alpha_2 $")
@@ -844,25 +859,41 @@ axis1[0,1].legend()
 axis1[1,1].set_title(r"$k$")
 axis1[1,1].set_xlabel('time (s)')
 
+figure1.savefig("unicycle_parameter.png")
+figure1.savefig("unicycle_parameter.eps")
+
 # Reward Plot
-axis2.set_title("Reward with time")#,y=1.0,pad=-14)
-axis2.set_xlabel('time step')
+# axis2.set_title("Reward with time")#,y=1.0,pad=-14)
+axis2.set_xlabel('time (s)')
+axis2.set_xlabel('Horizon Reward with Time')
 axis2.legend()
+figure2.savefig("unicycle_reward.png")
+figure2.savefig("unicycle_reward.eps")
+
 
 # Barrier Function Plots
 axis3.set_title("Barrier Functions")#,y=1.0,pad=-14)
-axis3.set_xlabel('time step')
+axis3.set_xlabel('time (s)')
 axis3.legend()
+figure3.savefig("unicycle_barrier.png")
+figure3.savefig("unicycle_barrier.eps")
 
 axis4[0].set_title('Target Position')
 axis4[0].legend()
 axis4[1].legend()
 axis4[1].set_xlabel('time step')
+figure4.savefig("unicycle_positions.png")
+figure4.savefig("unicycle_positions.eps")
 
 axis5[0].set_title('Control Inputs')
 axis5[0].legend()
+axis5[0].set_ylabel('Linear Velocity')
+axis5[1].set_ylabel('Angular Velocity')
 axis5[1].legend()
-axis5[1].set_xlabel('time step')
+axis5[1].set_xlabel('time (s)')
+figure5.savefig("unicycle_inputs.png")
+figure5.savefig("unicycle_inputs.eps")
+
 
 plt.show()
             

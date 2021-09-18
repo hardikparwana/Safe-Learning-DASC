@@ -164,10 +164,11 @@ class Unicycle2D:
 
     def CBF1_loss(self,target):
         h = self.max_D**2 - np.linalg.norm( self.X[0:2,0] - target.X[:,0] )**2
+        ratio = self.max_D**2 - self.min_D**2
         dh_dx_agent = np.append(- 2*( self.X[0:2,0] - target.X[:,0] ),0)
         dh_dx_target = 2*( self.X[0:2,0] - target.X[:,0] )
         # print(f"1: {self.max_D}, x:{self.X}, tX:{target.X}, {np.linalg.norm( self.X[0:2,0] - target.X[:,0] )}, diff:{self.X[0:2,0] - target.X[:,0]}")
-        return h, dh_dx_agent, dh_dx_target  #h_dot_A, h_dot_B
+        return h/ratio, dh_dx_agent/ratio, dh_dx_target/ratio  #h_dot_A, h_dot_B
 
     def CBF1_loss_cp(self, x, target):
         # h = self.max_D**2 - cp.square(cp.norm( x[0:2,0] - target.X[:,0] ))
@@ -194,11 +195,12 @@ class Unicycle2D:
         return dh_dx
 
     def CBF2_loss(self,target):
+        ratio = self.max_D**2 - self.min_D**2
         h = np.linalg.norm( self.X[0:2,0] - target.X[:,0] )**2 - self.min_D**2
         dh_dx_agent = np.append(2*( self.X[0:2,0] - target.X[:,0] ),0)
         dh_dx_target = - 2*( self.X[0:2,0] - target.X[:,0] )
 
-        return h, dh_dx_agent, dh_dx_target #h_dot_A, h_dot_B
+        return h/ratio, dh_dx_agent/ratio, dh_dx_target/ratio #h_dot_A, h_dot_B
 
     def CBF2_loss_cp(self, x, target):
         h = cp.square(cp.norm( x[0:2,0] - target.X[:,0] )) - self.min_D**2
