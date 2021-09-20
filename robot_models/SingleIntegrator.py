@@ -70,7 +70,7 @@ class SingleIntegrator:
         self.body.set_offsets([x[0],x[1]])
 
     def xdot(self,U):
-        return ( self.f + self.g @ U )
+        return torch.tensor( self.f + self.g @ U, dtype=torch.float )
 
     def agentBarrier(self,target,min_D):
         # min distance

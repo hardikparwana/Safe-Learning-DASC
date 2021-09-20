@@ -21,60 +21,64 @@ max_D = 3
 min_D = 0.3
 
 class Actor:
-    def __init__(self,alpha=0.1,k=0.1, beta = 0.1, umax=np.array([3,3]),umin=np.array([-3,-3]),horizon = 10) :
+    def __init__(self,alpha=0.1, alpha1 = 0.1, alpha2 = 0.1, alpha3 =0.1, k=0.1, beta = 0.1, umax=np.array([3,3]),umin=np.array([-3,-3]),horizon = 10) :
         self.alpha_nominal = alpha #1.0 does not work
-        self.alpha1_nominal = alpha
-        self.alpha2_nominal = alpha
-        self.alpha3_nominal = alpha
+        self.alpha1_nominal = alpha1
+        self.alpha2_nominal = alpha2
+        self.alpha3_nominal = alpha3
         self.k_nominal = k
+        self.ud_nominal = []
         self.max_action = umax
         self.min_action = umin
         self.horizon = horizon
         self.beta = beta
 
-        self.alpha1_tch = torch.tensor(self.alpha1_nominal, requires_grad=True, dtype=torch.float)
-        self.alpha2_tch = torch.tensor(self.alpha2_nominal, requires_grad=True, dtype=torch.float)
-        self.alpha3_tch = torch.tensor(self.alpha3_nominal, requires_grad=True, dtype=torch.float)
-        self.k_tch  = torch.tensor(self.k_nominal, requires_grad=True, dtype=torch.float)
+        self.alpha1_tch = [torch.tensor([self.alpha1_nominal], requires_grad=True, dtype=torch.float)]
+        self.alpha2_tch = [torch.tensor([self.alpha2_nominal], requires_grad=True, dtype=torch.float)]
+        self.alpha3_tch = [torch.tensor([self.alpha3_nominal], requires_grad=True, dtype=torch.float)]
+        self.k_tch  = [torch.tensor(self.k_nominal, requires_grad=True, dtype=torch.float)]
+        # self.ud_tch = []        
 
-        self.ud_tch = []
-        self.ud_nominal = []
-        for _ in range(horizon):
-            self.ud_tch.append( torch.tensor(np.array([[0],[0]]), requires_grad=True, dtype=torch.float) )
-        self.alpha1_grad = torch.tensor([0.0],dtype=torch.float)
-        self.alpha2_grad = torch.tensor([0.0],dtype=torch.float)
-        self.alpha3_grad = torch.tensor([0.0],dtype=torch.float)
-        self.k_grad = torch.tensor([0.0],dtype=torch.float)
+        # for _ in range(horizon):
+        #     self.ud_tch.append( torch.tensor(np.array([[0],[0]]), requires_grad=True, dtype=torch.float) )
+        
+        self.index_tensors = []
+        self.index_tensor_grads = []
 
-    def setParams(self):
-        self.alpha1_tch = torch.tensor(self.alpha1_nominal, requires_grad=True, dtype=torch.float)
-        self.alpha2_tch = torch.tensor(self.alpha2_nominal, requires_grad=True, dtype=torch.float)
-        self.alpha3_tch = torch.tensor(self.alpha3_nominal, requires_grad=True, dtype=torch.float)
-        self.k_tch  = torch.tensor(self.k_nominal, requires_grad=True, dtype=torch.float)
-        for i in range(self.horizon):
-            self.ud_tch[i] = torch.tensor(self.ud_nominal[i], requires_grad=True, dtype=torch.float)
+        self.alpha1_grad_sum = 0
+        self.alpha2_grad_sum = 0
+        self.alpha3_grad_sum = 0
+        self.k_grad_sum = 0
+        self.ud_grad_sum = [0,0]
+
+    def resetParams(self):
+        self.alpha1_tch = [torch.tensor(self.alpha1_nominal, requires_grad=True, dtype=torch.float)]
+        self.alpha2_tch = [torch.tensor(self.alpha2_nominal, requires_grad=True, dtype=torch.float)]
+        self.alpha3_tch = [torch.tensor(self.alpha3_nominal, requires_grad=True, dtype=torch.float)]
+        self.k_tch  = [torch.tensor(self.k_nominal, requires_grad=True, dtype=torch.float)]
+        # for i in range(self.horizon):
+        #     self.ud_tch[i] = torch.tensor(self.ud_nominal[i], requires_grad=True, dtype=torch.float)
+        self.index_tensors = []
+        self.index_tensor_grads = []
+        self.alpha1_grad_sum = 0
+        self.alpha2_grad_sum = 0
+        self.alpha3_grad_sum = 0
+        self.k_grad_sum = 0
+        self.ud_grad_sum = [0,0]
 
     def policy(self,X,agent,target,horizon_step):
 
-        if len(self.ud_nominal)<self.horizon:
-            # print("Nominal")
-            u, w = agent.nominal_controller(target)
-            U = np.array([u,w]).reshape(-1,1)
-            self.ud_nominal.append(U)
-            self.ud_tch[horizon_step] = torch.tensor(U, requires_grad=True, dtype=torch.float)           
-        else:
-            u, w = agent.nominal_controller(target)
-            U = np.array([u,w]).reshape(-1,1)
+        # if len(self.ud_nominal)<self.horizon:
+        #     # print("Nominal")
+        #     u, w = agent.nominal_controller(target)
+        #     U = np.array([u,w]).reshape(-1,1)
+        #     self.ud_nominal.append(U)
+        #     self.ud_tch[horizon_step] = torch.tensor(U, requires_grad=True, dtype=torch.float)           
+        # else:
+        #     u, w = agent.nominal_controller(target)
+        #     U = np.array([u,w]).reshape(-1,1)
 
-        V_,dV_dxA_f_, dV_dxA_g_,dV_dxB_ = agent.CLF_loss_tensor(X,target)
-        h1_,dh1_dxA_f_, dh1_dxA_g_,dh1_dxB_ = agent.CBF1_loss_tensor(X,target)
-        h2_,dh2_dxA_f_, dh2_dxA_g_,dh2_dxB_ = agent.CBF2_loss_tensor(X,target)
-        h3_,dh3_dxA_f_, dh3_dxA_g_,dh3_dxB_ = agent.CBF3_loss_tensor(X,target)
-        ah1_ = self.alpha1_tch*h1_  
-        ah2_ = self.alpha2_tch*h2_  
-        ah3_ = self.alpha3_tch*h3_  
-        # print("ah1", ah1_)
-        kV_ = self.k_tch * V_
+        U_d_ = agent.nominal_controller_tensor(X,target)
 
         u = cp.Variable((2,1))
         delta = cp.Variable(1)
@@ -99,7 +103,7 @@ class Actor:
         dV_dxA_g = cp.Parameter((1,2))
         dV_dxB = cp.Parameter((1,2))
 
-        U_d = cp.Parameter((2,1),value=U)
+        U_d = cp.Parameter((2,1),value=U_d_.detach().numpy())
         x = cp.Parameter((3,1))
 
         # QP objective
@@ -109,16 +113,6 @@ class Actor:
         const = [dV_dxA_f + dV_dxA_g @ u + dV_dxB @ target.xdot(target.U) <= -kV + delta]
         const += [delta>=0]
 
-        # print("h1")
-        # print(dh1_dxA_f_, dh1_dxA_g_, dh1_dxB_, h1_, ah1_, X, target.X)
-        # print("h2")
-        # print(dh2_dxA_f_, dh2_dxA_g_, dh2_dxB_, h2_, ah2_, X, target.X)
-        # print("h3")
-        # print(dh3_dxA_f_, dh3_dxA_g_, dh3_dxB_, h3_, ah3_, X, target.X)
-        # print("V")
-        # print(dV_dxA_f_, dV_dxA_g_, dV_dxB_, V_, kV_, X, target.X)
-        # print("k",self.k_tch)
-
         # CBF constraints
         const += [dh1_dxA_f + dh1_dxA_g @ u + dh1_dxB @ target.xdot(target.U) >= -ah1 ]
         const += [dh2_dxA_f + dh2_dxA_g @ u + dh2_dxB @ target.xdot(target.U) >= -ah2 ]
@@ -126,9 +120,34 @@ class Actor:
         # const += [alpha >= -20]
         problem = cp.Problem(objective,const)
         assert problem.is_dpp()
-        # exit()
-
+        
         cvxpylayer = CvxpyLayer(problem, parameters=[U_d, ah1,dh1_dxA_f, dh1_dxA_g,dh1_dxB, ah2,dh2_dxA_f, dh2_dxA_g,dh2_dxB, ah3,dh3_dxA_f,dh3_dxA_g,dh3_dxB,  kV,dV_dxA_f,dV_dxA_g,dV_dxB  ], variables=[u])
+
+        # define tensors
+        V_,dV_dxA_f_, dV_dxA_g_,dV_dxB_ = agent.CLF_loss_tensor(X,target)
+        h1_,dh1_dxA_f_, dh1_dxA_g_,dh1_dxB_ = agent.CBF1_loss_tensor(X,target)
+        h2_,dh2_dxA_f_, dh2_dxA_g_,dh2_dxB_ = agent.CBF2_loss_tensor(X,target)
+        h3_,dh3_dxA_f_, dh3_dxA_g_,dh3_dxB_ = agent.CBF3_loss_tensor(X,target)
+
+        # dh3_dxA_g_.sum().backward(retain_graph=True)
+        # alpha1_grad = X.grad #- self.alpha1_grad_sum
+        # # self.alpha1_grad_sum += alpha1_grad
+        # print("alpha1 grad policy", alpha1_grad)
+
+        alpha1_tch = self.alpha1_tch[-1] + 0
+        alpha2_tch = self.alpha2_tch[-1] + 0
+        alpha3_tch = self.alpha3_tch[-1] + 0
+        k_tch = self.k_tch[-1] + 0
+        alpha1_tch.retain_grad()
+        alpha2_tch.retain_grad()
+        alpha3_tch.retain_grad()
+        k_tch.retain_grad()
+        # u_tch = self.ud_tch[-1] + 0
+        ah1_ = alpha1_tch*h1_  
+        ah2_ = alpha2_tch*h2_  
+        ah3_ = alpha3_tch*h3_  
+        # print("ah1", ah1_)
+        kV_ = k_tch * V_       
 
         solver_args = {
             'verbose': False,
@@ -137,47 +156,209 @@ class Actor:
 
         # Solve the QP
         #  result = problem.solve()
-        # print("ud",self.ud_tch[horizon_step])
-        # print(ah1_.shape)
-        # print(ah1.shape)
+
+        # print(V_,dV_dxA_f_, dV_dxA_g_, dV_dxB_)
+
         try:
-            solution, = cvxpylayer(self.ud_tch[horizon_step], ah1_,dh1_dxA_f_, dh1_dxA_g_,dh1_dxB_, ah2_,dh2_dxA_f_, dh2_dxA_g_,dh2_dxB_, ah3_,dh3_dxA_f_, dh3_dxA_g_, dh3_dxB_,  kV_,dV_dxA_f_,dV_dxA_g_ ,dV_dxB_, solver_args=solver_args)
+            solution, = cvxpylayer(U_d_, ah1_,dh1_dxA_f_, dh1_dxA_g_,dh1_dxB_, ah2_,dh2_dxA_f_, dh2_dxA_g_,dh2_dxB_, ah3_,dh3_dxA_f_, dh3_dxA_g_, dh3_dxB_,  kV_,dV_dxA_f_,dV_dxA_g_ ,dV_dxB_, solver_args=solver_args)
+
+            # Now get gradients of all the constraints\
+            loss1 = dh1_dxA_f_ + torch.matmul(dh1_dxA_g_, solution) + torch.matmul(dh1_dxB_ , target.xdot(target.U)) + ah1_
+            loss2 = dh2_dxA_f_ + dh2_dxA_g_ @ solution + dh2_dxB_ @ target.xdot(target.U) + ah2_ 
+            loss3 = dh3_dxA_f_ + dh3_dxA_g_ @ solution + dh3_dxB_ @ target.xdot(target.U) + ah3_
+            loss4 = -dV_dxA_f_ - dV_dxA_g_ @ solution - dV_dxB_ @ target.xdot(target.U) - kV_ #- delta
+
+            if loss1.detach().numpy()<-0.01 or loss2.detach().numpy()<-0.01 or loss2.detach().numpy()<-0.01:
+                print("ERROR")
+
+            loss1.backward(retain_graph=True)       
+            grad1 = [self.alpha1_tch[0].grad.detach().numpy()[0]-self.alpha1_grad_sum, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum, self.alpha3_tch[0].grad.detach().numpy()[0]-self.alpha3_grad_sum, self.k_tch[0].grad.detach().numpy()-self.k_grad_sum]#, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum]
+            self.alpha1_grad_sum = self.alpha1_grad_sum + grad1[0]
+            self.alpha2_grad_sum = self.alpha2_grad_sum + grad1[1]
+            self.alpha3_grad_sum = self.alpha3_grad_sum + grad1[2]
+            self.k_grad_sum = self.k_grad_sum + grad1[3]
+            # print("GRAD1",grad1)
+            # print(alpha1_tch.grad.detach().numpy(),alpha2_tch.grad.detach().numpy(),alpha3_tch.grad.detach().numpy(),k_tch.grad.detach().numpy())
+
+            # s_time = time.time()
+            loss2.backward(retain_graph=True)            
+            grad2 = [self.alpha1_tch[0].grad.detach().numpy()[0]-self.alpha1_grad_sum, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum, self.alpha3_tch[0].grad.detach().numpy()[0]-self.alpha3_grad_sum, self.k_tch[0].grad.detach().numpy()-self.k_grad_sum]#, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum]
+            # print("One time ", time.time()-s_time)
+            self.alpha1_grad_sum = self.alpha1_grad_sum + grad2[0]
+            self.alpha2_grad_sum = self.alpha2_grad_sum + grad2[1]
+            self.alpha3_grad_sum = self.alpha3_grad_sum + grad2[2]
+            self.k_grad_sum = self.k_grad_sum + grad2[3]
+            # print("GRAD2",grad2)
+
+            loss3.backward(retain_graph=True)            
+            grad3 = [self.alpha1_tch[0].grad.detach().numpy()[0]-self.alpha1_grad_sum, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum, self.alpha3_tch[0].grad.detach().numpy()[0]-self.alpha3_grad_sum, self.k_tch[0].grad.detach().numpy()-self.k_grad_sum]#, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum]
+            self.alpha1_grad_sum = self.alpha1_grad_sum + grad3[0]
+            self.alpha2_grad_sum = self.alpha2_grad_sum + grad3[1]
+            self.alpha3_grad_sum = self.alpha3_grad_sum + grad3[2]
+            self.k_grad_sum = self.k_grad_sum + grad3[3]
+            # print("GRAD3",grad3)
+
+            loss4.backward(retain_graph=True)            
+            grad4 = [self.alpha1_tch[0].grad.detach().numpy()[0]-self.alpha1_grad_sum, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum, self.alpha3_tch[0].grad.detach().numpy()[0]-self.alpha3_grad_sum, self.k_tch[0].grad.detach().numpy()-self.k_grad_sum]#, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum]
+            self.alpha1_grad_sum = self.alpha1_grad_sum + grad4[0]
+            self.alpha2_grad_sum = self.alpha2_grad_sum + grad4[1]
+            self.alpha3_grad_sum = self.alpha3_grad_sum + grad4[2]
+            self.k_grad_sum = self.k_grad_sum + grad4[3]
+
+            self.index_tensors.append(loss1.detach().numpy()[0])
+            self.index_tensors.append(loss2.detach().numpy()[0])
+            
+            self.index_tensors.append(loss3.detach().numpy()[0])
+            self.index_tensors.append(loss4.detach().numpy()[0])
+            self.alpha1_tch.append(alpha1_tch)
+            self.alpha2_tch.append(alpha2_tch)
+            self.alpha3_tch.append(alpha3_tch)
+            self.k_tch.append(k_tch)
+            self.index_tensor_grads.append(grad1)
+            self.index_tensor_grads.append(grad2)
+            self.index_tensor_grads.append(grad3)
+            self.index_tensor_grads.append(grad4)
+
         except:
             print("SBF QP not solvable")
-            traceback.print_exc()
-            return False, np.array([0,0]).reshape(-1,1), 0, 0
+            # traceback.print_exc()
+            # return False, np.array([0,0]).reshape(-1,1), 0, 0
+
+            delta1 = cp.Variable(1)
+            delta2 = cp.Variable(1)
+            delta3 = cp.Variable(1)
+
+            # CLF constraint
+            const = [dV_dxA_f + dV_dxA_g @ u + dV_dxB @ target.xdot(target.U) <= -kV + delta]
+            const += [delta>=0]
+
+            # CBF constraints
+            const += [dh1_dxA_f + dh1_dxA_g @ u + dh1_dxB @ target.xdot(target.U) >= -ah1 - delta1 ]
+            const += [dh2_dxA_f + dh2_dxA_g @ u + dh2_dxB @ target.xdot(target.U) >= -ah2 - delta2]
+            const += [dh3_dxA_f + dh3_dxA_g @ u + dh3_dxB @ target.xdot(target.U) >= -ah3 - delta3]
+            const += [delta1 >= 0]
+            const += [delta2 >= 0]
+            const += [delta3 >= 0]
+
+            # QP objective 1
+            objective = cp.Minimize(100000*delta1 + 100000*delta2 + delta3)
+            problem = cp.Problem(objective,const)
+            problem.solve()
+            # print(f"Resolve slacks ", delta1.value, delta2.value)
+            if problem.status != 'optimal':
+                print("ERROR in Resolve")
+            delta3_min = delta3.value
+
+            # QP objective 2
+            objective = cp.Minimize(delta1 + 100000*delta2 + 100000*delta3)
+            problem = cp.Problem(objective,const)
+            problem.solve()
+            # print(f"Resolve slacks ", delta1.value, delta2.value)
+            if problem.status != 'optimal':
+                print("ERROR in Resolve")
+            delta1_min = delta1.value
+
+            # QP objective 3
+            objective = cp.Minimize(1000000*delta1 + delta2 + 100000*delta3)
+            problem = cp.Problem(objective,const)
+            problem.solve()
+            # print(f"Resolve slacks ", delta1.value, delta2.value)
+            if problem.status != 'optimal':
+                print("ERROR in Resolve")
+            delta2_min = delta2.value
+
+            const_index = []
+            if delta1.value > 0.0:
+                const_index.append(0)
+            if delta2.value > 0.0:
+                const_index.append(1)
+            index = np.argmin(np.array([delta1_min, delta2_min, delta3_min]))
+            const_index.append(0)
+
+            # Now get gradients of all the constraints
+            loss1 = dh1_dxA_f + dh1_dxB @ target.xdot(target.U) + ah1
+            loss2 = dh2_dxA_f + dh2_dxB @ target.xdot(target.U) + ah2 
+            loss3 = dh3_dxA_f + dh3_dxB @ target.xdot(target.U) + ah3
+            loss4 = -dV_dxA_f - dV_dxB @ target.xdot(target.U) - kV
+
+            if loss1.detach().numpy()<-0.01 or loss2.detach().numpy()<-0.01 or loss2.detach().numpy()<-0.01:
+                print("ERROR")
+
+            loss1.backward(retain_graph=True)            
+            grad1 = [self.alpha1_tch[0].grad.detach().numpy()[0]-self.alpha1_grad_sum, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum, self.alpha3_tch[0].grad.detach().numpy()[0]-self.alpha3_grad_sum, self.k_tch[0].grad.detach().numpy()-self.k_grad_sum]#, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum]
+            self.alpha1_grad_sum = self.alpha1_grad_sum + grad1[0]
+            self.alpha2_grad_sum = self.alpha2_grad_sum + grad1[1]
+            self.alpha3_grad_sum = self.alpha3_grad_sum + grad1[2]
+            self.k_grad_sum = self.k_grad_sum + grad1[3]
+
+            loss2.backward(retain_graph=True)            
+            grad2 = [self.alpha1_tch[0].grad.detach().numpy()[0]-self.alpha1_grad_sum, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum, self.alpha3_tch[0].grad.detach().numpy()[0]-self.alpha3_grad_sum, self.k_tch[0].grad.detach().numpy()-self.k_grad_sum]#, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum]
+            self.alpha1_grad_sum = self.alpha1_grad_sum + grad2[0]
+            self.alpha2_grad_sum = self.alpha2_grad_sum + grad2[1]
+            self.alpha3_grad_sum = self.alpha3_grad_sum + grad2[2]
+            self.k_grad_sum = self.k_grad_sum + grad2[3]
+
+            loss3.backward(retain_graph=True)            
+            grad3 = [self.alpha1_tch[0].grad.detach().numpy()[0]-self.alpha1_grad_sum, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum, self.alpha3_tch[0].grad.detach().numpy()[0]-self.alpha3_grad_sum, self.k_tch[0].grad.detach().numpy()-self.k_grad_sum]#, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum]
+            self.alpha1_grad_sum = self.alpha1_grad_sum + grad3[0]
+            self.alpha2_grad_sum = self.alpha2_grad_sum + grad3[1]
+            self.alpha3_grad_sum = self.alpha3_grad_sum + grad3[2]
+            self.k_grad_sum = self.k_grad_sum + grad3[3]
+
+            loss4.backward(retain_graph=True)            
+            grad4 = [self.alpha1_tch[0].grad.detach().numpy()[0]-self.alpha1_grad_sum, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum, self.alpha3_tch[0].grad.detach().numpy()[0]-self.alpha3_grad_sum, self.k_tch[0].grad.detach().numpy()-self.k_grad_sum]#, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum]
+            self.alpha1_grad_sum = self.alpha1_grad_sum + grad4[0]
+            self.alpha2_grad_sum = self.alpha2_grad_sum + grad4[1]
+            self.alpha3_grad_sum = self.alpha3_grad_sum + grad4[2]
+            self.k_grad_sum = self.k_grad_sum + grad4[3]
+
+            self.index_tensors.append(loss1.detach().numpy()[0])
+            self.index_tensors.append(loss2.detach().numpy()[0])
+            
+            self.index_tensors.append(loss3.detach().numpy()[0])
+            self.index_tensors.append(loss4.detach().numpy()[0])
+            self.alpha1_tch.append(alpha1_tch)
+            self.alpha2_tch.append(alpha2_tch)
+            self.alpha3_tch.append(alpha3_tch)
+            self.k_tch.append(k_tch)
+            self.index_tensor_grads.append(grad1)
+            self.index_tensor_grads.append(grad2)
+            self.index_tensor_grads.append(grad3)
+            self.index_tensor_grads.append(grad4)
+
+            return False, const_index
+
         # exit()
         # print("solution",solution)
-        return solution[0]  # A tensor
+        solution.retain_grad()
+        return solution[0], False  # A tensor
+
+    # def mdp_layer():
+    #     '''
+
+    #     '''
+
 
     def updateParameters(self,rewards):
-        policy_gradient = []
 
+        # finr direction for improving performance
         objective_tensor = torch.tensor(0,requires_grad=True, dtype=torch.float)
         for index, value in enumerate(rewards): #index from 0 to horizon -1
-            # print("obj", objective_tensor)
-            objective_tensor = objective_tensor + value
-            
-
-        # print("Objective Tensor", objective_tensor)
+            objective_tensor = objective_tensor + value            
         objective_tensor.backward(retain_graph=True)
 
         # Get Gradients
-        print("g2",self.alpha1_tch.grad)
-        alpha1_grad = self.alpha1_tch.grad - self.alpha1_grad
-        alpha2_grad = self.alpha2_tch.grad - self.alpha2_grad
-        alpha3_grad = self.alpha3_tch.grad - self.alpha3_grad
-        k_grad = self.k_tch.grad #- self.k_grad
+        alpha1_grad = self.alpha1_tch[0].grad - self.alpha1_grad_sum
+        alpha2_grad = self.alpha2_tch[0].grad - self.alpha2_grad_sum
+        alpha3_grad = self.alpha3_tch[0].grad - self.alpha3_grad_sum
+        k_grad = self.k_tch[0].grad - self.k_grad_sum
 
-        self.alpha1_grad = self.alpha1_grad + alpha1_grad
-        self.alpha2_grad = self.alpha2_grad + alpha2_grad
-        self.alpha3_grad = self.alpha3_grad + alpha3_grad
-        self.k_grad = self.k_tch.grad + k_grad
+        self.alpha1_grad_sum = self.alpha1_grad_sum + alpha1_grad
+        self.alpha2_grad_sum = self.alpha2_grad_sum + alpha2_grad
+        self.alpha3_grad_sum = self.alpha3_grad_sum + alpha3_grad
+        self.k_grad_sum = self.k_grad_sum + k_grad
 
         print(objective_tensor, alpha1_grad, alpha2_grad, alpha3_grad, k_grad)
-        ud_grad = []
-        for i in range(self.horizon):
-            ud_grad.append( self.ud_tch[i].grad  )
 
         ## TODO: write code for constrained GD here
         self.alpha1_nominal = self.alpha1_nominal + self.beta*alpha1_grad.detach().numpy()
@@ -194,7 +375,44 @@ class Actor:
             self.alpha3_nominal = 0
         if self.k_nominal < 0:
             self.k_nominal = 0
-        # print(f"alpha1_nom:{self.actor.alpha_nominal}, alpha2_nom:{self.actor.alpha2_nominal}, alpha3_nom:{self.actor.alpha3_nominal} k_nominal:{self.actor.k_nominal}")
+        print(f"alpha1_nom:{self.alpha_nominal}, alpha2_nom:{self.alpha2_nominal}, alpha3_nom:{self.alpha3_nominal} k_nominal:{self.k_nominal}")
+
+        episode_reward = objective_tensor.detach().numpy()
+        return episode_reward
+
+    def updateParameterFeasibility(self,rewards,indexes):
+        # No need to make new tensors here
+
+        # find feasible direction with QP first
+        N = len(self.index_tensors) - 2
+        d = cp.Variable((2,1))
+        e = cp.Parameter((N,1), value = np.asarray(self.index_tensors[0:-2]).reshape(-1,1))
+        grad_e = cp.Parameter((N,2), value = np.asarray(self.index_tensor_grads[0:-2]))
+
+        st = e.value>=-0.01
+        if [False] in st:
+            print (st)
+
+        const = [e + grad_e @ d >= -0.01]
+        const += [cp.abs(d[0,0])<= 100]
+        const += [cp.abs(d[1,0])<=100]
+
+        ## find direction of final feasibility
+        infeasible_constraint = self.index_tensors[-2:][indexes[0]]
+        infeasible_constraint_grad = self.index_tensor_grads[-2:][indexes[0]]
+        d_infeasible = cp.Parameter((2,1),value = np.asarray(infeasible_constraint_grad).reshape(-1,1))
+        objective = cp.Maximize(d.T @ d_infeasible)
+        problem = cp.Problem(objective, const)
+        problem.solve()
+        if problem.status!='optimal':
+            return False, 
+
+        self.alpha1_nominal = self.alpha1_nominal + self.beta*d.value[0,0]
+        self.alpha2_nominal = self.alpha2_nominal + self.beta*d.value[1,0]
+
+        return True
+
+
 
 def train(args):
 
@@ -214,19 +432,22 @@ def train(args):
     # set robots
     t = 0
     dt = args.dt
-    agentF = Unicycle2D(np.array([0,0.2,0]),dt,3,FoV,max_D,min_D)
-    agentF.d1 = 0
-    agentF.d2 = 0
-    agentF.d3 = 0
-    agentT = SingleIntegrator(np.array([1,0]),dt,ax,0)
 
     #Set policy agent
-    actor = Actor(alpha=args.alpha,k=args.k, horizon=args.horizon, beta=args.lr_actor)
+    print("HERE")
+    actor = Actor(alpha=args.alpha, alpha1 = args.alpha1, alpha2=args.alpha2, alpha3=args.alpha3, k=args.k, horizon=args.horizon, beta=args.lr_actor)
     dynam = torch_dynamics.apply
+
+    episode_rewards = []
+    parameters = []
+    parameters.append([args.alpha1, args.alpha2])
+    ftime = []
 
     for ep in range(args.total_episodes):
 
         # Initialize tensor list
+        agentF = Unicycle2D(np.array([0,0.2,0]),dt,3,FoV,max_D,min_D)
+        agentT = SingleIntegrator(np.array([1,0]),dt,ax,0)
         state_tensors = [torch.tensor(agentF.X,dtype=torch.float,requires_grad=True)]
         input_tensors = []
         rewards = []
@@ -242,18 +463,40 @@ def train(args):
             vL = 2.6*np.sin(np.pi*t_roll) #  0.1 # 1.2
 
             x = state_tensors[-1]
-            u = actor.policy(x, agentF,agentT,horizon_step)  # tensor    
-            # print("u",u)
+
+            # s_time = time.time()
+            u, indexes = actor.policy(x, agentF,agentT,horizon_step)  # tensor    
+            if False in u:
+                print("QP Failed at ", horizon_step)
+                ftime.append(horizon_step)
+                break
+            # print("time policy",time.time()-s_time)
+            # s_time = time.time()
             x_ = dynam(x,u)  
-            # print("x_",x_)     
-            
-            # compute reward: should be a reward
-            # r = compute_reward(x_)
+            x_.retain_grad()
+            # print("time dynamics",time.time()-s_time)
+            # print(f"x_:{x_}, u:{u}")   
             
             # Store state and input tensors
             state_tensors.append(x_)
             input_tensors.append(u)
             rewards.append( agentF.compute_reward_tensor(x_,agentT) )
+
+            usum = u.sum()
+            usum.backward(retain_graph=True)
+            alpha1_grad = actor.alpha1_tch[0].grad - actor.alpha1_grad_sum
+            actor.alpha1_grad_sum += alpha1_grad
+            # print("alpha1 grad solution", alpha1_grad)
+            # print("x grad solution", x.grad)
+
+            reward = rewards[-1].sum()
+            reward.backward(retain_graph=True)
+            alpha1_grad = actor.alpha1_tch[0].grad - actor.alpha1_grad_sum
+            actor.alpha1_grad_sum += alpha1_grad
+            
+            # print("alpha1 grad reward", alpha1_grad)
+            # print("x grad reward", x_.grad)
+            # exit()
 
             t_roll += dt
 
@@ -270,9 +513,28 @@ def train(args):
             fig.canvas.flush_events()
 
         t += dt
+        # print("done")
+
+        if indexes == False:
+            print("Parameter Successful! -> Improving PERFORMANCE")
+            success = actor.updateParameters(rewards)
+            if not success:
+                break
+            parameters.append([actor.alpha1_nominal, actor.alpha2_nominal])
+            actor.resetParams()
+        else:
+            # Update parameter feasibility
+            print("Parameter Unsuccessful -> Improving FEASIBILITY")
+            success = actor.updateParameterFeasibility(rewards, indexes)
+            if not success:
+                break
+            parameters.append([actor.alpha1_nominal, actor.alpha2_nominal])
+            actor.resetParams()
        
+        # sum_reward = actor.updateParameters(rewards)
+        # episode_rewards.append(sum_reward)
     
-        actor.updateParameters(rewards)
+        # actor.updateParameters(rewards)
     
 
 
@@ -311,11 +573,14 @@ parser.add_argument('--plot_freq', type=float, default=1, metavar='G',help='plot
 parser.add_argument('--batch-size', type=int, default=10, metavar='N', help='batch size (default: 256)') #100
 parser.add_argument('--buffer-capacity', type=int, default=20, metavar='N', help='buffer_capacity') #10
 parser.add_argument('--max-steps', type=int, default=200, metavar='N',help='maximum number of steps of each episode') #70
-parser.add_argument('--total-episodes', type=int, default=1, metavar='N',help='total training episodes') #1000
+parser.add_argument('--total-episodes', type=int, default=10, metavar='N',help='total training episodes') #1000
 parser.add_argument('--policy-freq', type=int, default=500, metavar='N',help='update frequency of target network ')
 parser.add_argument('--start-timestep', type=int, default=10000, metavar='N',help='number of steps using random policy')
-parser.add_argument('--horizon', type=int, default=10, metavar='N',help='RL time horizon') #3
+parser.add_argument('--horizon', type=int, default=20, metavar='N',help='RL time horizon') #3
 parser.add_argument('--alpha', type=float, default=0.15, metavar='G',help='CBF parameter')  #0.003
+parser.add_argument('--alpha1', type=float, default=1.0, metavar='G',help='CBF parameter')  #0.003
+parser.add_argument('--alpha2', type=float, default=0.7, metavar='G',help='CBF parameter')  #0.003
+parser.add_argument('--alpha3', type=float, default=0.7, metavar='G',help='CBF parameter')  #0.003
 parser.add_argument('--k', type=float, default=0.1, metavar='G',help='CLF parameter')  #0.003
 parser.add_argument('--train', type=float, default=True, metavar='G',help='CLF parameter')  #0.003
 parser.add_argument('--movie', type=float, default=True, metavar='G',help='CLF parameter')  #0.003

@@ -67,9 +67,6 @@ class Actor:
         alpha1_v = cp.Variable(1) # for alpha1
         alpha2_v = cp.Variable(1) # for alpha2
 
-        # alpha1 = cp.Parameter(1,value = self.alpha1_tch[0].detach().numpy())
-        # alpha2 = cp.Parameter(1,value = self.alpha2_tch[0].detach().numpy())
-
         alpha1 = cp.Parameter(1,value = [self.alpha1_nominal])
         alpha2 = cp.Parameter(1,value = [self.alpha2_nominal])
 
@@ -91,10 +88,6 @@ class Actor:
         assert problem.is_dpp()
         # problem.solve()
 
-        # print(f"h1:{h1.value}, h2:{h2.value}, ah1:{alpha1.value*h1.value}, ah2:{alpha2.value*h2.value}, h1dot:{h1_dot.value}, h2dot:{h2_dot.value}")
-
-        # exit()
-
         cvxpylayer = CvxpyLayer(problem, parameters=[x, alpha1, alpha2 ], variables=[u])
 
         solver_args = {
@@ -102,12 +95,6 @@ class Actor:
             'max_iters': 1000000,
         }
 
-        # Solve the QP
-        # result = problem.solve()
-        # print(f"c1:{h1_dot.value + alpha1.value*h1.value}, c2:{h2_dot.value + alpha2.value*h2.value}, u:{u.value}")
-        # print(X, self.alpha1_tch, self.alpha2_tch)
-        # alpha1_tch = torch.tensor(alpha1.value, requires_grad=True, dtype=torch.float)
-        # alpha2_tch = torch.tensor(alpha2.value, requires_grad=True, dtype=torch.float)
         alpha1_tch = self.alpha1_tch[-1] + 0
         # alpha1_tch.retain_grad()
         alpha2_tch = self.alpha2_tch[-1] + 0
@@ -133,12 +120,8 @@ class Actor:
             grad1 = [self.alpha1_tch[0].grad.detach().numpy()[0]-self.alpha1_grad_sum, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum]
             self.alpha1_grad_sum = self.alpha1_grad_sum + grad1[0]
             self.alpha2_grad_sum = self.alpha2_grad_sum + grad1[1]
-
-            # print("l1 alpha1_tch.grad",alpha1_tch.grad)
-            # print("l1 alpha2_tch.grad",alpha2_tch.grad)
             
             loss2 = h2_dot_ + alpha2_tch*h2_ 
-            # print(f"tensor c1:{loss1}, c2:{loss2}, u:{solution}")
             if loss2.detach().numpy()<-0.01:
                 print("ERROR")
                 # exit()
@@ -146,12 +129,6 @@ class Actor:
             grad2 = [self.alpha1_tch[0].grad.detach().numpy()[0]-self.alpha1_grad_sum, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum]
             self.alpha1_grad_sum = self.alpha1_grad_sum + grad2[0]
             self.alpha2_grad_sum = self.alpha2_grad_sum + grad2[1]
-
-            # print(f"grad1:{grad1}, grad2:{grad2}, 1sum:{self.alpha1_grad_sum}, 2sum:{self.alpha2_grad_sum}")
-            # print("solution",solution)
-            # print("l2 alpha1_tch.grad",alpha1_tch.grad)
-            # print("l2 alpha2_tch.grad",alpha2_tch.grad)
-            # print("X.grad",alpha2_tch.grad)
 
             self.index_tensors.append(loss1.detach().numpy()[0])
             self.index_tensors.append(loss2.detach().numpy()[0])
@@ -260,7 +237,6 @@ class Actor:
         objective_tensor.backward(retain_graph=True)
 
         # Get Gradients
-        # print("g2",self.alpha1_tch.grad)
         alpha1_grad = self.alpha1_tch.grad - self.alpha1_grad
         alpha2_grad = self.alpha2_tch.grad - self.alpha2_grad
         # k_grad = self.k_tch.grad #- self.k_grad
@@ -383,9 +359,6 @@ def train(args):
         for horizon_step in range(args.horizon):    
 
             # print("iter",horizon_step)        
-
-            uL = 0.5
-            vL = 2.6*np.sin(np.pi*t_roll) #  0.1 # 1.2
 
             x = state_tensors[-1]
             u, indexes = actor.policy(x, agentF,horizon_step, t_roll, c = c)  # tensor    
