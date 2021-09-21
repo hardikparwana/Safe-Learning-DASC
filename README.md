@@ -29,7 +29,9 @@ The code was run on Ubuntu 20 with Python 3.6 and following packages
 To run the code, run `source export_setup.sh` from main folder
 
 # 1D Autonomous Car
-Run the following code:
+To examine how the car behaves with different values of parameters, see our notebook example **car_example.ipynb**.
+
+For running our algorithm to increase horizon for feasibility of QP controller, run the following code where you should be able to see improvement of time at which QP fails.
 ```
 python QPpolicy/QPpolicyTorchCar.py 
 ```
@@ -46,9 +48,7 @@ Following figures show how parameters change with each step of proposed GD
 
 
 # Unicycle Follower
-To examine how the car behaves with different values of parameters, see our notebook example **car_example.ipynb**.
-
-For running our algorithm to increase horizon for feasibility of QP controller, run the following code where you should be able to see improvement of time at which QP fails.
+Run the following code
 ```
 python QPpolicy/QPpolicy.py
 ```
