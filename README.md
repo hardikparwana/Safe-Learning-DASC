@@ -18,6 +18,6 @@ We propose a novel combination of backpropagation for dynamical systems and use 
 
 | Adaptive Parameters (proposed) | Constant Parameter | Reward Plot |
 | -------- | -------- | ----------- |
-| <img src="https://user-images.githubusercontent.com/19849515/134234311-9fc31797-b721-4457-9415-a7189ca9b247.gif" width="330" /> | <img src="https://user-images.githubusercontent.com/19849515/134234319-a9864ba6-277d-4ca4-a500-4597f596d805.gif" width="330"/> | <img src="https://user-images.githubusercontent.com/19849515/134234324-38a3c582-4c73-422b-8d56-bd31e0229648.gif" width="330"/> |
+| <img src="https://user-images.githubusercontent.com/19849515/134234311-9fc31797-b721-4457-9415-a7189ca9b247.gif" width="300" /> | <img src="https://user-images.githubusercontent.com/19849515/134234319-a9864ba6-277d-4ca4-a500-4597f596d805.gif" width="300"/> | <img src="https://user-images.githubusercontent.com/19849515/134234324-38a3c582-4c73-422b-8d56-bd31e0229648.gif" width="300"/> |
 | Green leader is better maintained near center of FoV by follower | The performance is not so good | Red - Adaptive, green- constant
 
