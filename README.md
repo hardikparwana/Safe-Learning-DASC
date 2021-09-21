@@ -19,15 +19,6 @@ We propose a novel combination of backpropagation for dynamical systems and use 
 1. Performance is improved with guarantees of feasible trajectory over the same time horizon.
 2. The horizon over which the QP controller remains feasible is increased compared to its previous value.
 
-# 1D Autonomous Car
-| a = 2.5, b=4.5 | a = 1.0, b = 3.0 | a = 3.0, b = 1.0 |
-| --------------| -------------------| -----------------|
-| ![param1](https://user-images.githubusercontent.com/19849515/134238619-0b8f2729-0f02-479b-b744-f8030934fa20.gif) | ![param2](https://user-images.githubusercontent.com/19849515/134238621-7be16c78-0188-4bbe-94f7-988372a3eb84.gif) | ![param3](https://user-images.githubusercontent.com/19849515/134238629-f443d52b-5f0f-4861-ac36-2c0aa4046fa0.gif) |
-
-$$ h_1 $$
-
-<img src="https://render.githubusercontent.com/render/math?math=h_{1} = x -t">,
-<img src="https://render.githubusercontent.com/render/math?math=h_{2} = 1 + c t - x">
 
 # Unicycle Follower
 
@@ -37,3 +28,12 @@ $$ h_1 $$
 | <img src="https://user-images.githubusercontent.com/19849515/134234311-9fc31797-b721-4457-9415-a7189ca9b247.gif" width="300" /> | <img src="https://user-images.githubusercontent.com/19849515/134234319-a9864ba6-277d-4ca4-a500-4597f596d805.gif" width="300"/> | <img src="https://user-images.githubusercontent.com/19849515/134234324-38a3c582-4c73-422b-8d56-bd31e0229648.gif" width="300"/> |
 
 
+# 1D Autonomous Car
+
+
+| a = 2.5, b=4.5 | a = 1.0, b = 3.0 | a = 3.0, b = 1.0 |
+| --------------| -------------------| -----------------|
+| ![param1](https://user-images.githubusercontent.com/19849515/134238619-0b8f2729-0f02-479b-b744-f8030934fa20.gif) | ![param2](https://user-images.githubusercontent.com/19849515/134238621-7be16c78-0188-4bbe-94f7-988372a3eb84.gif) | ![param3](https://user-images.githubusercontent.com/19849515/134238629-f443d52b-5f0f-4861-ac36-2c0aa4046fa0.gif) |
+
+
+![paper_car](https://user-images.githubusercontent.com/19849515/134240335-acbbbf98-9f4f-4da5-a198-accfb27d0a72.png)
