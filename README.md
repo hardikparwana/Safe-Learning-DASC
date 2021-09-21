@@ -14,3 +14,12 @@ What is the best we can do *given a parametric controller*? How to adapt their p
 We propose a novel combination of backpropagation for dynamical systems and use FSQP algorithms to update parameters of QP so that:
 1. Performance is improved with guarantees of feasible trajectory over the same time horizon.
 2. The horizon over which the QP controller remains feasible is increased compared to its previous value.
+
+Adaptive Parameter
+https://youtu.be/WIWQghdr8pQ
+
+Constant Parameter
+https://youtu.be/5TpZvvy_EX0
+
+Reward comparison
+https://youtu.be/8KMjdLVvKsw
