@@ -26,6 +26,8 @@ We propose a novel combination of backpropagation for dynamical systems and use 
 
 $$ h_1 $$
 
+<img src="https://render.githubusercontent.com/render/math?math=e^{i \pi} = -1">
+
 # Unicycle Follower
 
 
