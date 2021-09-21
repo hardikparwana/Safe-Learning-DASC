@@ -35,4 +35,14 @@ Following figures show how parameters change with each step of proposed GD
 | ![param1](https://user-images.githubusercontent.com/19849515/134238619-0b8f2729-0f02-479b-b744-f8030934fa20.gif) | ![param2](https://user-images.githubusercontent.com/19849515/134238621-7be16c78-0188-4bbe-94f7-988372a3eb84.gif) | ![param3](https://user-images.githubusercontent.com/19849515/134238629-f443d52b-5f0f-4861-ac36-2c0aa4046fa0.gif) |
 
 
+# Dependencies
+The code was run on Ubuntu 20 with Python 3.6 and following packages
+- cvxpy==1.1.14
+- cvxpylayers==0.1.5
+- torch==1.9.0
+- matplotlib==3.3.4
+- numpy==1.19.5
+
+To run the code, run `source export_setup.sh` from main folder
+
 ![paper_car](https://user-images.githubusercontent.com/19849515/134240335-acbbbf98-9f4f-4da5-a198-accfb27d0a72.png)
