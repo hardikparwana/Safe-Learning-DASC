@@ -40,8 +40,7 @@ class Actor:
 
         self.alpha1_tch = [torch.tensor([self.alpha1_nominal], requires_grad=True, dtype=torch.float)]
         self.alpha2_tch = [torch.tensor([self.alpha2_nominal], requires_grad=True, dtype=torch.float)]
-        self.k_tch  = torch.tensor(self.k_nominal, requires_grad=True, dtype=torch.float)
-
+      
         self.index_tensors = []
         self.index_tensor_grads = []
 
@@ -67,9 +66,6 @@ class Actor:
         alpha1_v = cp.Variable(1) # for alpha1
         alpha2_v = cp.Variable(1) # for alpha2
 
-        # alpha1 = cp.Parameter(1,value = self.alpha1_tch[0].detach().numpy())
-        # alpha2 = cp.Parameter(1,value = self.alpha2_tch[0].detach().numpy())
-
         alpha1 = cp.Parameter(1,value = [self.alpha1_nominal])
         alpha2 = cp.Parameter(1,value = [self.alpha2_nominal])
 
@@ -89,11 +85,7 @@ class Actor:
         objective = cp.Maximize(u)
         problem = cp.Problem(objective,const)
         assert problem.is_dpp()
-        # problem.solve()
 
-        # print(f"h1:{h1.value}, h2:{h2.value}, ah1:{alpha1.value*h1.value}, ah2:{alpha2.value*h2.value}, h1dot:{h1_dot.value}, h2dot:{h2_dot.value}")
-
-        # exit()
 
         cvxpylayer = CvxpyLayer(problem, parameters=[x, alpha1, alpha2 ], variables=[u])
 
@@ -101,18 +93,9 @@ class Actor:
             'verbose': False,
             'max_iters': 1000000,
         }
-
-        # Solve the QP
-        # result = problem.solve()
-        # print(f"c1:{h1_dot.value + alpha1.value*h1.value}, c2:{h2_dot.value + alpha2.value*h2.value}, u:{u.value}")
-        # print(X, self.alpha1_tch, self.alpha2_tch)
-        # alpha1_tch = torch.tensor(alpha1.value, requires_grad=True, dtype=torch.float)
-        # alpha2_tch = torch.tensor(alpha2.value, requires_grad=True, dtype=torch.float)
         alpha1_tch = self.alpha1_tch[-1] + 0
-        # alpha1_tch.retain_grad()
         alpha2_tch = self.alpha2_tch[-1] + 0
-        # alpha2_tch.retain_grad()
-        # print("self",self.alpha1_tch)
+  
 
         try:
             # print("passed",alpha1_tch)
@@ -128,17 +111,13 @@ class Actor:
             loss1 = h1_dot_ + alpha1_tch*h1_ 
             if loss1.detach().numpy()<-0.01:
                 print("ERROR")
-                # exit()
+
             loss1.backward(retain_graph=True)            
             grad1 = [self.alpha1_tch[0].grad.detach().numpy()[0]-self.alpha1_grad_sum, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum]
             self.alpha1_grad_sum = self.alpha1_grad_sum + grad1[0]
             self.alpha2_grad_sum = self.alpha2_grad_sum + grad1[1]
-
-            # print("l1 alpha1_tch.grad",alpha1_tch.grad)
-            # print("l1 alpha2_tch.grad",alpha2_tch.grad)
             
             loss2 = h2_dot_ + alpha2_tch*h2_ 
-            # print(f"tensor c1:{loss1}, c2:{loss2}, u:{solution}")
             if loss2.detach().numpy()<-0.01:
                 print("ERROR")
                 # exit()
@@ -147,20 +126,12 @@ class Actor:
             self.alpha1_grad_sum = self.alpha1_grad_sum + grad2[0]
             self.alpha2_grad_sum = self.alpha2_grad_sum + grad2[1]
 
-            # print(f"grad1:{grad1}, grad2:{grad2}, 1sum:{self.alpha1_grad_sum}, 2sum:{self.alpha2_grad_sum}")
-            # print("solution",solution)
-            # print("l2 alpha1_tch.grad",alpha1_tch.grad)
-            # print("l2 alpha2_tch.grad",alpha2_tch.grad)
-            # print("X.grad",alpha2_tch.grad)
-
             self.index_tensors.append(loss1.detach().numpy()[0])
             self.index_tensors.append(loss2.detach().numpy()[0])
             self.alpha1_tch.append(alpha1_tch)
             self.alpha2_tch.append(alpha2_tch)
             self.index_tensor_grads.append(grad1)
             self.index_tensor_grads.append(grad2)
-
-            # exit()
 
         except:
             # print("SBF QP not solvable")
@@ -242,8 +213,7 @@ class Actor:
 
         
             return False, const_index
-        # exit()
-        # print("solution",solution)
+
         solution.retain_grad()
         return solution, False  # A tensor
 
@@ -255,29 +225,22 @@ class Actor:
             # print("obj", objective_tensor)
             objective_tensor = objective_tensor + value
             
-
-        # print("Objective Tensor", objective_tensor)
         objective_tensor.backward(retain_graph=True)
 
         # Get Gradients
-        # print("g2",self.alpha1_tch.grad)
         alpha1_grad = self.alpha1_tch.grad - self.alpha1_grad
         alpha2_grad = self.alpha2_tch.grad - self.alpha2_grad
-        # k_grad = self.k_tch.grad #- self.k_grad
 
         self.alpha1_grad = self.alpha1_grad + alpha1_grad
         self.alpha2_grad = self.alpha2_grad + alpha2_grad
-        # self.k_grad = self.k_tch.grad + k_grad
 
         print(objective_tensor, alpha1_grad, alpha2_grad)#, alpha3_grad)#, k_grad)
         ud_grad = []
         for i in range(self.horizon):
             ud_grad.append( self.ud_tch[i].grad  )
 
-        ## TODO: write code for constrained GD here
         self.alpha1_nominal = self.alpha1_nominal + self.beta*alpha1_grad.detach().numpy()
         self.alpha2_nominal = self.alpha2_nominal + self.beta*alpha2_grad.detach().numpy()
-        # self.k_nominal = self.k_nominal + self.beta*k_grad.detach().numpy()
 
         # clipping > 0
         if self.alpha1_nominal < 0:
@@ -287,53 +250,36 @@ class Actor:
 
         episode_reward = objective_tensor.detach().numpy()[0]
         return episode_reward
-        # if self.k_nominal < 0:
-        #     self.k_nominal = 0
-        # print(f"alpha1_nom:{self.actor.alpha_nominal}, alpha2_nom:{self.actor.alpha2_nominal}, alpha3_nom:{self.actor.alpha3_nominal} k_nominal:{self.actor.k_nominal}")
-
-    # def FSQP(self,constraints):
+       
 
     def updateParameterFeasibility(self,rewards,indexes):
         # No need to make new tensors here
 
         # find feasible direction with QP first
-
-
         N = len(self.index_tensors) - 2
         d = cp.Variable((2,1))
-        # print(f"N={N}, it:{len(self.index_tensors[0:-2])}, tensors:{self.index_tensors}")
-        # print("grads: ", self.index_tensor_grads)
+
         # of feasible time horizon
         e = cp.Parameter((N,1), value = np.asarray(self.index_tensors[0:-2]).reshape(-1,1))
         grad_e = cp.Parameter((N,2), value = np.asarray(self.index_tensor_grads[0:-2]))
 
-        # print("product", grad_e.shape)
-        # print("s2",d.shape)
         st = e.value>=-0.01
         if [False] in st:
             print (st)
-        # print("org", e.value>=-0.01)
 
         const = [e + grad_e @ d >= -0.01]
         const += [cp.abs(d[0,0])<= 100]
         const += [cp.abs(d[1,0])<=100]
 
         ## find direction of final feasibility
-        # print(indexes)
-        # print("last",self.index_tensors[-1])
         infeasible_constraint = self.index_tensors[-2:][indexes[0]]
-        # print("grad", self.index_tensor_grads)
-        # print(indexes[0])
         infeasible_constraint_grad = self.index_tensor_grads[-2:][indexes[0]]
         d_infeasible = cp.Parameter((2,1),value = np.asarray(infeasible_constraint_grad).reshape(-1,1))
-        # objective = cp.Minimize(cp.sum_squares(d-d_infeasible))
         objective = cp.Maximize(d.T @ d_infeasible)
         problem = cp.Problem(objective, const)
         problem.solve()
         if problem.status!='optimal':
             return False, 
-        # print(f"direction: {d.T.value}, infeasible's:{d_infeasible.T.value}")
-        # print( (d.T @ d_infeasible).value )
 
         self.alpha1_nominal = self.alpha1_nominal + self.beta*d.value[0,0]
         self.alpha2_nominal = self.alpha2_nominal + self.beta*d.value[1,0]
@@ -430,9 +376,6 @@ def train(args):
                 break
             parameters.append([actor.alpha1_nominal, actor.alpha2_nominal])
             actor.resetParams()
-       
-        # sum_reward = actor.updateParameters(rewards)
-        # episode_rewards.append(sum_reward)
 
     print("Parameters ", parameters)
     print("horizons", ftime)

@@ -40,7 +40,6 @@ class SingleIntegrator:
         self.U = np.array([0,0]).reshape(-1,1)
 
         self.body = ax.scatter([],[],c=('r' if self.id==0 else 'g'),s=10)
-        # self.render_plot()
         
     def step(self,ux,uy): #Just holonomic X,T acceleration
 
@@ -71,33 +70,3 @@ class SingleIntegrator:
 
     def xdot(self,U):
         return ( self.f + self.g @ U )
-
-    def agentBarrier(self,target,min_D):
-        # min distance
-        h = np.linalg.norm( self.X - target.X )**2 - min_D**2
-        factor = 2*( self.X - target.X )
-        dh_dx_agent = np.array([factor[0,0], factor[1,0]])
-        dh_dx_target = -dh_dx_agent
-        return h, dh_dx_agent, dh_dx_target
-
-    def obsBarrier(self,target,min_D):
-        # min distance
-        h = np.linalg.norm( self.X - target.X )**2 - min_D**2
-        # print(f"agent:{self.X}, obs:{target.X}, h:{h}")
-        dh_dx_agent = np.array([2*( self.X - target.X )[0,0], 2*( self.X - target.X )[1,0]] )
-        return h, dh_dx_agent
-
-    def connectivityBarrier(self,target,max_D):
-        # max distance
-        h = max_D**2 - np.linalg.norm( self.X - target.X )**2
-        dh_dx_agent = np.array([-2*( self.X - target.X )[0,0], -2*( self.X - target.X )[1,0] ])
-        dh_dx_target = -dh_dx_agent
-        return h, dh_dx_agent, dh_dx_target
-
-    def Lyapunov(self,target,dist):
-        #desired distance
-        V = (np.linalg.norm( self.X - target.X ) - dist)**2
-        factor = 2*(np.linalg.norm( self.X - target.X ) - dist)/np.linalg.norm( self.X - target.X ) * ( np.array([ self.X[0,0], self.X[1,0] ]) - np.array([target.X[0,0],target.X[1,0]]) )
-        dV_dx_agent = factor
-        dV_dx_target = -factor
-        return V, dV_dx_agent, dV_dx_target
