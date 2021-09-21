@@ -31,6 +31,4 @@ https://user-images.githubusercontent.com/19849515/134233786-ac48c01b-c111-4f07-
 
 
 
-<figure class="video_container">
-  <iframe src="https://user-images.githubusercontent.com/19849515/134233753-a6f3fa43-0071-4eef-933c-9a4650e28c48.mp4" frameborder="0" allowfullscreen="true"> </iframe>
-</figure>
+![](https://user-images.githubusercontent.com/19849515/134233753-a6f3fa43-0071-4eef-933c-9a4650e28c48.mp4)
