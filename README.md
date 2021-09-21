@@ -11,8 +11,7 @@ We pose the question:
 
 What is the best we can do *given a parametric controller*? How to adapt their parameters in face of different external conditions? And what if the controller is an optimization problem itself? Can we maintain *feasibility over a horizon* if we change the parameter? In other words, how do we relate state-feedback controllers(that depend on current state only) to their long-term performance.
 
-![QP controller](https://user-images.githubusercontent.com/19849515/134239081-62a049c6-fa01-4483-9b5a-0ae639900e34.png)
-
+![qp_controller](https://user-images.githubusercontent.com/19849515/134256967-0d5b1f4b-aed0-45e7-9f2e-5376c2b713ca.png)
 
 
 We propose a novel combination of backpropagation for dynamical systems and use FSQP algorithms to update parameters of QP so that:
