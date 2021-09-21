@@ -24,6 +24,7 @@ We propose a novel combination of backpropagation for dynamical systems and use 
 | --------------| -------------------| -----------------|
 | ![param1](https://user-images.githubusercontent.com/19849515/134238619-0b8f2729-0f02-479b-b744-f8030934fa20.gif) | ![param2](https://user-images.githubusercontent.com/19849515/134238621-7be16c78-0188-4bbe-94f7-988372a3eb84.gif) | ![param3](https://user-images.githubusercontent.com/19849515/134238629-f443d52b-5f0f-4861-ac36-2c0aa4046fa0.gif) |
 
+$$ h_1 $$
 
 # Unicycle Follower
 
