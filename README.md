@@ -20,7 +20,7 @@ Adaptive Parameter
   <iframe src="https://youtu.be/WIWQghdr8pQ" frameborder="1" allowfullscreen="true"> </iframe>
 </figure>
 
-[![](https://youtu.be/WIWQghdr8pQ)
+[![](https://youtu.be/WIWQghdr8pQ)]
 
 Constant Parameter
 https://youtu.be/5TpZvvy_EX0
