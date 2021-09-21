@@ -46,7 +46,9 @@ Following figures show how parameters change with each step of proposed GD
 
 
 # Unicycle Follower
-Run the following code:
+To examine how the car behaves with different values of parameters, see our notebook example **car_example.ipynb**.
+
+For running our algorithm to increase horizon for feasibility of QP controller, run the following code where you should be able to see improvement of time at which QP fails.
 ```
 python QPpolicy/QPpolicy.py
 ```
