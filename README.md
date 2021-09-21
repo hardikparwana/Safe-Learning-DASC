@@ -4,7 +4,7 @@ This repository implements our ICRA 2022 submission on
 
 **Recursive Feasibility Guided Optimal Parameter Adaptation of Differential Convex Optimization Policies for Safety-Critical Systems**
 
-Authors: Hardik Parwana, Dimitra Panagou, University of Michigan
+Authors: Hardik Parwana and Dimitra Panagou, University of Michigan
 
 ## Description
 We pose the question: 
