@@ -17,5 +17,5 @@ We propose a novel combination of backpropagation for dynamical systems and use 
 
 Adaptive Parameter
 
-![](https://youtu.be/WIWQghdr8pQ)
+![](http://damien.pobel.fr/images/youtube-video-github.gif)
 
