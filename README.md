@@ -6,7 +6,7 @@ This repository implements our ICRA 2022 submission on
 
 Authors: Hardik Parwana and Dimitra Panagou, University of Michigan
 
-Note: thsi repo is under development. While all the relevant are present, we will work on making it more readable and customizable soon! Stay Tuned!
+Note: this repo is under development. While all the relevant code is present, we will work on making it more readable and customizable soon! Stay Tuned!
 
 ## Description
 We pose the question: 
