@@ -16,9 +16,7 @@ We propose a novel combination of backpropagation for dynamical systems and use 
 2. The horizon over which the QP controller remains feasible is increased compared to its previous value.
 
 Adaptive Parameter
-<figure class="video_container">
-  <iframe src="https://youtu.be/WIWQghdr8pQ" frameborder="1" allowfullscreen="true"> </iframe>
-</figure>
+
 
 [![](https://youtu.be/WIWQghdr8pQ)]
 
