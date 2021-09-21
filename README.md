@@ -13,4 +13,4 @@ What is the best we can do *given a parametric controller*? How to adapt their p
 
 We propose a novel combination of backpropagation for dynamical systems and use FSQP algorithms to update parameters of QP so that:
 1. Performance is improved with guarantees of feasible trajectory over the same time horizon.
-2. Defining *Feasbility Horizon* as time upto which QP based controllers remain feasible for a given parameter choice, how do we improve the feasibility horizon?
+2. How do we increase the horizon over which the QP controller remains feasible?
