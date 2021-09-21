@@ -19,15 +19,10 @@ Adaptive Parameter
 
 video: https://www.youtube.com/embed/WIWQghdr8pQ
 
+![adaptive](https://user-images.githubusercontent.com/19849515/134234311-9fc31797-b721-4457-9415-a7189ca9b247.gif)
 
-https://user-images.githubusercontent.com/19849515/134233753-a6f3fa43-0071-4eef-933c-9a4650e28c48.mp4
-
-
-
-https://user-images.githubusercontent.com/19849515/134233782-c9c1c02f-bac2-42ac-a714-5587d883fbdb.mp4
-
-
-https://user-images.githubusercontent.com/19849515/134233786-ac48c01b-c111-4f07-a0ec-06fda23cf456.mp4
+![constant](https://user-images.githubusercontent.com/19849515/134234319-a9864ba6-277d-4ca4-a500-4597f596d805.gif)
+![rewsrds](https://user-images.githubusercontent.com/19849515/134234324-38a3c582-4c73-422b-8d56-bd31e0229648.gif)
 
 
 
