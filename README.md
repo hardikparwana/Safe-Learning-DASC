@@ -15,11 +15,6 @@ We propose a novel combination of backpropagation for dynamical systems and use 
 1. Performance is improved with guarantees of feasible trajectory over the same time horizon.
 2. The horizon over which the QP controller remains feasible is increased compared to its previous value.
 
-<style>
-td, th {
-   border: none!important;
-}
-</style>
 
 | Adaptive Parameters (proposed) | Constant Parameter | Reward Plot |
 | -------- | -------- | ----------- |
