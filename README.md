@@ -28,15 +28,13 @@ The code was run on Ubuntu 20 with Python 3.6 and following packages
 
 To run the code, run `source export_setup.sh` from main folder
 
-# Unicycle Follower
-
-
-| Adaptive Parameters (proposed) | Constant Parameter | Reward Plot |
-| -------- | -------- | ----------- |
-| <img src="https://user-images.githubusercontent.com/19849515/134234311-9fc31797-b721-4457-9415-a7189ca9b247.gif" width="300" /> | <img src="https://user-images.githubusercontent.com/19849515/134234319-a9864ba6-277d-4ca4-a500-4597f596d805.gif" width="300"/> | <img src="https://user-images.githubusercontent.com/19849515/134234324-38a3c582-4c73-422b-8d56-bd31e0229648.gif" width="300"/> |
-
-
 # 1D Autonomous Car
+Run the following code:
+```
+python QPpolicy/QPpolicyTorchCar.py 
+```
+
+
 Following figures show how parameters change with each step of proposed GD
 
 | a = 2.5, b=4.5 | a = 1.0, b = 3.0 | a = 3.0, b = 1.0 |
@@ -45,3 +43,16 @@ Following figures show how parameters change with each step of proposed GD
 
 
 ![paper_car](https://user-images.githubusercontent.com/19849515/134240335-acbbbf98-9f4f-4da5-a198-accfb27d0a72.png)
+
+
+# Unicycle Follower
+Run the following code:
+```
+python QPpolicy/QPpolicy.py
+```
+
+
+| Adaptive Parameters (proposed) | Constant Parameter | Reward Plot |
+| -------- | -------- | ----------- |
+| <img src="https://user-images.githubusercontent.com/19849515/134234311-9fc31797-b721-4457-9415-a7189ca9b247.gif" width="300" /> | <img src="https://user-images.githubusercontent.com/19849515/134234319-a9864ba6-277d-4ca4-a500-4597f596d805.gif" width="300"/> | <img src="https://user-images.githubusercontent.com/19849515/134234324-38a3c582-4c73-422b-8d56-bd31e0229648.gif" width="300"/> |
+
