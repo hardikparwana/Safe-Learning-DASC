@@ -17,14 +17,5 @@ We propose a novel combination of backpropagation for dynamical systems and use 
 
 Adaptive Parameter
 
-<figure class="video_container">
-  <iframe src="https://www.youtube.com/embed/enMumwvLAug" frameborder="0" allowfullscreen="true"> </iframe>
-</figure>
-
 ![](https://youtu.be/WIWQghdr8pQ)
 
-Constant Parameter
-https://youtu.be/5TpZvvy_EX0
-
-Reward comparison
-https://youtu.be/8KMjdLVvKsw
