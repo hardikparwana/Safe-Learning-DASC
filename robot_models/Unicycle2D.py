@@ -2,6 +2,7 @@ import numpy as np
 import cvxpy as cp
 import torch
 import math
+import matplotlib.patches as mpatches
 
 dt = 0.01
 
@@ -96,8 +97,15 @@ class Unicycle2D:
         X_sim[2] = self.wrap_angle(X_sim[2])
         
         return X_sim
+
+    def arc_points(self, center, radius, theta1, theta2, resolution=50):
+        # generate the points
+        theta = np.linspace(theta1, theta2, resolution)
+        points = np.vstack((radius*np.cos(theta) + center[0], 
+                            radius*np.sin(theta) + center[1]))
+        return points.T
     
-    def render(self,lines,areas,body):
+    def render(self,lines,areas,body, poly, des_point):
         # length = 3
         # FoV = np.pi/3   # 60 degrees
 
@@ -112,6 +120,9 @@ class Unicycle2D:
         P1 = x + self.FoV_length*e1
         P2 = x + self.FoV_length*e2  
 
+        des_dist = self.min_D + (self.max_D - self.min_D)/2
+        des_x = np.array( [ self.X[0,0] + np.cos(theta)*des_dist, self.X[1,0] + np.sin(theta)*des_dist    ] )
+
         triangle_hx = [x[0] , P1[0], P2[0], x[0] ]
         triangle_hy = [x[1] , P1[1], P2[1], x[1] ]
         
@@ -122,8 +133,12 @@ class Unicycle2D:
 
         # scatter plot update
         body.set_offsets([x[0],x[1]])
+        des_point.set_offsets([des_x[0], des_x[1]])
 
-        return lines, areas, body
+        #Fov arc
+        poly.set_xy(self.arc_points(x, self.FoV_length, theta2, theta1))
+
+        return lines, areas, body, poly, des_point
 
     def wrap_angle(self,angle):
         if angle>np.pi:

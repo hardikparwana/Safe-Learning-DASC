@@ -78,6 +78,19 @@ def predict_GP_dynamics(GP_list,N,X):
         Y_std.append(sigma_pred[0])
     return np.asarray(Y), np.asarray(Y_std)
 
+def arc_patch(center, radius, theta1, theta2, ax=None, resolution=50, **kwargs):
+    # make sure ax is not empty
+    if ax is None:
+        ax = plt.gca()
+    # generate the points
+    theta = np.linspace(np.radians(theta1), np.radians(theta2), resolution)
+    points = np.vstack((radius*np.cos(theta) + center[0], 
+                        radius*np.sin(theta) + center[1]))
+    # build the polygon and add it to the axes
+    poly = mpatches.Polygon(points.T, closed=True, **kwargs)
+    ax.add_patch(poly)
+    return poly
+
 
 class Actor:
     def __init__(self,alpha=0.1,k=0.1,umax=np.array([3,3]),umin=np.array([-3,-3])) :
@@ -486,15 +499,19 @@ def train(args):
             fig = plt.figure()
             ax = plt.axes(xlim=(0,10),ylim=(-5,5))
             lines, = ax.plot([],[],'o-')
+            poly = mpatches.Polygon([(0,0.2)], closed=True, color='r',alpha=0.1, linewidth=0) #[] is Nx2
+            fov_arc = ax.add_patch(poly)
+            print("fov_arc",fov_arc)
             areas, = ax.fill([],[],'r',alpha=0.1)
             bodyF = ax.scatter([],[],c='r',s=10)            
             bodyT = ax.scatter([],[],c='g',s=10)
+            des_point = ax.scatter([],[],s=10, facecolors='none', edgecolors='g')
             ax.set_xlabel("X")
             ax.set_ylabel("Y")
             ax.set_aspect(1)
         if args.movie==True:
             frames = [] # for storing the generated images
-
+    
         # state = env.reset()
         episodic_reward = 0
         timestep = 0
@@ -664,7 +681,7 @@ def train(args):
 
                 # animation plot
                 if ep % args.plot_freq ==0:
-                    lines, areas, bodyF = agentF.render(lines,areas,bodyF)
+                    lines, areas, bodyF, poly, des_point = agentF.render(lines,areas,bodyF, poly, des_point)
                     bodyT = agentT.render(bodyT)
                     
                     fig.canvas.draw()
@@ -792,6 +809,7 @@ colors2 = colors.copy()
 colors2.reverse()
 
 index = 0
+data = []
 for Alpha in Alphas:
     for K in Ks:
         for Beta in Betas:
@@ -799,7 +817,7 @@ for Alpha in Alphas:
             args.k = K
             args.lr_actor = Beta
             args.train = True
-            # args.movie_name = movie_names[index]
+            args.movie_name = movie_names[index]
 
             if index==0:
                 name = 'Adaptive Parameter'
@@ -808,7 +826,7 @@ for Alpha in Alphas:
             # name = 'test'
             
             episode_reward, moving_reward, alphas, ks, t_plot, deltas, h1s, h2s, h3s, TXs, actions, alpha1s, alpha2s, alpha3s =  train(args)
-
+            data.append( (episode_reward, moving_reward, alphas, ks, t_plot, deltas, h1s, h2s, h3s, TXs, actions, alpha1s, alpha2s, alpha3s) )
             # Reward Plot
             axis2.plot(t_plot,episode_reward,c = colors[index],label = name)
 

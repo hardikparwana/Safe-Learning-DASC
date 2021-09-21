@@ -40,7 +40,7 @@ class SingleIntegrator:
         self.U = np.array([0,0]).reshape(-1,1)
 
         self.body = ax.scatter([],[],c=('r' if self.id==0 else 'g'),s=10)
-        self.render_plot()
+        # self.render_plot()
         
     def step(self,ux,uy): #Just holonomic X,T acceleration
 
