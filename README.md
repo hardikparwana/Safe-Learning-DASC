@@ -29,7 +29,7 @@ We propose a novel combination of backpropagation for dynamical systems and use 
 
 
 # 1D Autonomous Car
-
+Following figures show how parameters change with each step of proposed GD
 
 | a = 2.5, b=4.5 | a = 1.0, b = 3.0 | a = 3.0, b = 1.0 |
 | --------------| -------------------| -----------------|
