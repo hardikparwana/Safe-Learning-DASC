@@ -2,8 +2,6 @@ import numpy as np
 import time
 import argparse
 import matplotlib.pyplot as plt
-from numpy.core.defchararray import index
-from numpy.core.fromnumeric import trace
 
 import torch
 import cvxpy as cp
@@ -17,10 +15,7 @@ from robot_models.SingleIntegrator1D import *
 from dynamics1D import *
 import traceback
 
-from torchviz import make_dot
-
 import warnings
-
 warnings.filterwarnings('ignore')
 
 FoV = 60*np.pi/180
