@@ -6,6 +6,8 @@ This repository implements our ICRA 2022 submission on
 
 Authors: Hardik Parwana and Dimitra Panagou, University of Michigan
 
+Note: this repo is under development. While all the relevant code is present, we will work on making it more readable and customizable soon! Stay Tuned!
+
 ## Description
 We pose the question: 
 
@@ -18,16 +20,25 @@ We propose a novel combination of backpropagation for dynamical systems and use 
 1. Performance is improved with guarantees of feasible trajectory over the same time horizon.
 2. The horizon over which the QP controller remains feasible is increased compared to its previous value.
 
+# Dependencies
+The code was run on Ubuntu 20 with Python 3.6 and following packages
+- cvxpy==1.1.14
+- cvxpylayers==0.1.5
+- torch==1.9.0
+- matplotlib==3.3.4
+- numpy==1.19.5
 
-# Unicycle Follower
-
-
-| Adaptive Parameters (proposed) | Constant Parameter | Reward Plot |
-| -------- | -------- | ----------- |
-| <img src="https://user-images.githubusercontent.com/19849515/134234311-9fc31797-b721-4457-9415-a7189ca9b247.gif" width="300" /> | <img src="https://user-images.githubusercontent.com/19849515/134234319-a9864ba6-277d-4ca4-a500-4597f596d805.gif" width="300"/> | <img src="https://user-images.githubusercontent.com/19849515/134234324-38a3c582-4c73-422b-8d56-bd31e0229648.gif" width="300"/> |
-
+To run the code, run `source export_setup.sh` from main folder
 
 # 1D Autonomous Car
+To examine how the car behaves with different values of parameters, see our notebook example **car_example.ipynb**.
+
+For running our algorithm to increase horizon for feasibility of QP controller, run the following code where you should be able to see improvement of time at which QP fails.
+```
+python QPpolicy/QPpolicyTorchCar.py 
+```
+
+
 Following figures show how parameters change with each step of proposed GD
 
 | a = 2.5, b=4.5 | a = 1.0, b = 3.0 | a = 3.0, b = 1.0 |
@@ -36,3 +47,16 @@ Following figures show how parameters change with each step of proposed GD
 
 
 ![paper_car](https://user-images.githubusercontent.com/19849515/134240335-acbbbf98-9f4f-4da5-a198-accfb27d0a72.png)
+
+
+# Unicycle Follower
+Run the following code
+```
+python QPpolicy/QPpolicy.py
+```
+
+
+| Adaptive Parameters (proposed) | Constant Parameter | Reward Plot |
+| -------- | -------- | ----------- |
+| <img src="https://user-images.githubusercontent.com/19849515/134234311-9fc31797-b721-4457-9415-a7189ca9b247.gif" width="300" /> | <img src="https://user-images.githubusercontent.com/19849515/134234319-a9864ba6-277d-4ca4-a500-4597f596d805.gif" width="300"/> | <img src="https://user-images.githubusercontent.com/19849515/134234324-38a3c582-4c73-422b-8d56-bd31e0229648.gif" width="300"/> |
+
