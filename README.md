@@ -6,6 +6,9 @@ This repository implements our ICRA 2022 submission on
 
 Authors: Hardik Parwana and Dimitra Panagou, University of Michigan
 
+An early access version can be found at
+https://arxiv.org/abs/2109.10949
+
 Note: this repo is under development. While all the relevant code is present, we will work on making it more readable and customizable soon! Stay Tuned!
 
 ## Description
