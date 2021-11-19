@@ -16,6 +16,8 @@ class torch_dynamics(torch.autograd.Function):
         fx = fx_(x)  
         gx = gx_(x)  
         
+        # print(fx,gx)
+        
         # for gradient computation
         df_dx =  df_dx_(x) 
         dgxu_dx = dgxu_dx_(x, u)  
@@ -42,6 +44,8 @@ class torch_dynamics(torch.autograd.Function):
         
         gradient_x = df_dx + dgxu_dx
         gradient_u =  gx 
+        
+        print("grads", gradient_u, gradient_x)
 
         output_grad_x = torch.reshape(torch.matmul(torch.transpose(grad_output,0,1),gradient_x),(n_x,1))
         output_grad_u = torch.reshape(torch.matmul(torch.transpose(grad_output,0,1),gradient_u),(n_u,1))

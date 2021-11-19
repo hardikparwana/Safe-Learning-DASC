@@ -20,6 +20,7 @@ FoV = 60*np.pi/180
 max_D = 3
 min_D = 0.3
 
+
 class Actor:
     def __init__(self,alpha=0.1, alpha1 = 0.1, alpha2 = 0.1, alpha3 =0.1, k=0.1, beta = 0.1, umax=np.array([3,3]),umin=np.array([-3,-3]),horizon = 10) :
         self.alpha_nominal = alpha #1.0 does not work
@@ -67,67 +68,22 @@ class Actor:
         self.ud_grad_sum = [0,0]
 
     def policy(self,X,agent,target,horizon_step):
-
-        # if len(self.ud_nominal)<self.horizon:
-        #     # print("Nominal")
-        #     u, w = agent.nominal_controller(target)
-        #     U = np.array([u,w]).reshape(-1,1)
-        #     self.ud_nominal.append(U)
-        #     self.ud_tch[horizon_step] = torch.tensor(U, requires_grad=True, dtype=torch.float)           
-        # else:
-        #     u, w = agent.nominal_controller(target)
-        #     U = np.array([u,w]).reshape(-1,1)
-
+        
+        #agent nominal velocity
         U_d_ = agent.nominal_controller_tensor(X,target)
-
-        u = cp.Variable((2,1))
-        delta = cp.Variable(1)
-
-        ah1 = cp.Parameter(1)
-        dh1_dxA_f = cp.Parameter(1)
-        dh1_dxA_g = cp.Parameter((1,2))
-        dh1_dxB = cp.Parameter((1,2))
-
-        ah2 = cp.Parameter(1)
-        dh2_dxA_f = cp.Parameter(1)
-        dh2_dxA_g = cp.Parameter((1,2))
-        dh2_dxB = cp.Parameter((1,2))
-
-        ah3 = cp.Parameter(1)
-        dh3_dxA_f = cp.Parameter(1)
-        dh3_dxA_g = cp.Parameter((1,2))
-        dh3_dxB = cp.Parameter((1,2))
-
-        kV = cp.Parameter(1)
-        dV_dxA_f = cp.Parameter(1)
-        dV_dxA_g = cp.Parameter((1,2))
-        dV_dxB = cp.Parameter((1,2))
-
-        U_d = cp.Parameter((2,1),value=U_d_.detach().numpy())
-        x = cp.Parameter((3,1))
-
-        # QP objective
-        objective = cp.Minimize(cp.sum_squares(u-U_d) + 100*delta)
         
-        # CLF constraint
-        const = [dV_dxA_f + dV_dxA_g @ u + dV_dxB @ target.xdot(target.U) <= -kV + delta]
-        const += [delta>=0]
-
-        # CBF constraints
-        const += [dh1_dxA_f + dh1_dxA_g @ u + dh1_dxB @ target.xdot(target.U) >= -ah1 ]
-        const += [dh2_dxA_f + dh2_dxA_g @ u + dh2_dxB @ target.xdot(target.U) >= -ah2 ]
-        const += [dh3_dxA_f + dh3_dxA_g @ u + dh3_dxB @ target.xdot(target.U) >= -ah3 ]
-        # const += [alpha >= -20]
-        problem = cp.Problem(objective,const)
-        assert problem.is_dpp()
+        #target tensor
+        target_xdot_ = target.xdot(target.U)
         
-        cvxpylayer = CvxpyLayer(problem, parameters=[U_d, ah1,dh1_dxA_f, dh1_dxA_g,dh1_dxB, ah2,dh2_dxA_f, dh2_dxA_g,dh2_dxB, ah3,dh3_dxA_f,dh3_dxA_g,dh3_dxB,  kV,dV_dxA_f,dV_dxA_g,dV_dxB  ], variables=[u])
-
         # define tensors
-        V_,dV_dxA_f_, dV_dxA_g_,dV_dxB_ = agent.CLF_loss_tensor(X,target)
-        h1_,dh1_dxA_f_, dh1_dxA_g_,dh1_dxB_ = agent.CBF1_loss_tensor(X,target)
-        h2_,dh2_dxA_f_, dh2_dxA_g_,dh2_dxB_ = agent.CBF2_loss_tensor(X,target)
-        h3_,dh3_dxA_f_, dh3_dxA_g_,dh3_dxB_ = agent.CBF3_loss_tensor(X,target)
+        V_,dV_dxA_f_, dV_dxA_g_,dV_dxB_temp = agent.CLF_loss_tensor(X,target)
+        h1_,dh1_dxA_f_, dh1_dxA_g_,dh1_dxB_temp = agent.CBF1_loss_tensor(X,target)
+        h2_,dh2_dxA_f_, dh2_dxA_g_,dh2_dxB_temp = agent.CBF2_loss_tensor(X,target)
+        h3_,dh3_dxA_f_, dh3_dxA_g_,dh3_dxB_temp = agent.CBF3_loss_tensor(X,target)
+        dV_dxB_target_xdot_ = dV_dxB_temp @ target_xdot_
+        dh1_dxB_target_xdot_ = dV_dxB_temp @ target_xdot_
+        dh2_dxB_target_xdot_ = dV_dxB_temp @ target_xdot_
+        dh3_dxB_target_xdot_ = dV_dxB_temp @ target_xdot_
 
         # dh3_dxA_g_.sum().backward(retain_graph=True)
         # alpha1_grad = X.grad #- self.alpha1_grad_sum
@@ -154,13 +110,8 @@ class Actor:
             'max_iters': 1000000
         }
 
-        # Solve the QP
-        #  result = problem.solve()
-
-        # print(V_,dV_dxA_f_, dV_dxA_g_, dV_dxB_)
-
         try:
-            solution, = cvxpylayer(U_d_, ah1_,dh1_dxA_f_, dh1_dxA_g_,dh1_dxB_, ah2_,dh2_dxA_f_, dh2_dxA_g_,dh2_dxB_, ah3_,dh3_dxA_f_, dh3_dxA_g_, dh3_dxB_,  kV_,dV_dxA_f_,dV_dxA_g_ ,dV_dxB_, solver_args=solver_args)
+            solution, = cvxpylayer(U_d_, ah1_,dh1_dxA_f_, dh1_dxA_g_,dh1_dxB_target_xdot_, ah2_,dh2_dxA_f_, dh2_dxA_g_,dh2_dxB_target_xdot_, ah3_,dh3_dxA_f_, dh3_dxA_g_, dh3_dxB_target_xdot_,  kV_,dV_dxA_f_,dV_dxA_g_ ,dV_dxB_target_xdot_, solver_args=solver_args)
 
             ssum = solution.sum()
             # ssum = self.alpha1_tch[-1].sum()
@@ -172,10 +123,10 @@ class Actor:
 
 
             # Now get gradients of all the constraints\
-            loss1 = dh1_dxA_f_ + torch.matmul(dh1_dxA_g_, solution) + torch.matmul(dh1_dxB_ , target.xdot(target.U)) + ah1_
-            loss2 = dh2_dxA_f_ + dh2_dxA_g_ @ solution + dh2_dxB_ @ target.xdot(target.U) + ah2_ 
-            loss3 = dh3_dxA_f_ + dh3_dxA_g_ @ solution + dh3_dxB_ @ target.xdot(target.U) + ah3_
-            loss4 = -dV_dxA_f_ - dV_dxA_g_ @ solution - dV_dxB_ @ target.xdot(target.U) - kV_ #- delta
+            loss1 = dh1_dxA_f_ + torch.matmul(dh1_dxA_g_, solution) + dh1_dxB_target_xdot_ + ah1_
+            loss2 = dh2_dxA_f_ + dh2_dxA_g_ @ solution + dh2_dxB_target_xdot_ + ah2_ 
+            loss3 = dh3_dxA_f_ + dh3_dxA_g_ @ solution + dh3_dxB_target_xdot_  + ah3_
+            loss4 = -dV_dxA_f_ - dV_dxA_g_ @ solution - dV_dxB_target_xdot_ - kV_ #- delta
  
             if loss1.detach().numpy()<-0.01 or loss2.detach().numpy()<-0.01 or loss2.detach().numpy()<-0.01:
                 print("ERROR")
@@ -242,13 +193,13 @@ class Actor:
             delta3 = cp.Variable(1)
 
             # CLF constraint
-            const = [dV_dxA_f + dV_dxA_g @ u + dV_dxB @ target.xdot(target.U) <= -kV + delta]
+            const = [dV_dxA_f + dV_dxA_g @ u + dV_dxB_target_xdot  <= -kV + delta]
             const += [delta>=0]
 
             # CBF constraints
-            const += [dh1_dxA_f + dh1_dxA_g @ u + dh1_dxB @ target.xdot(target.U) >= -ah1 - delta1 ]
-            const += [dh2_dxA_f + dh2_dxA_g @ u + dh2_dxB @ target.xdot(target.U) >= -ah2 - delta2]
-            const += [dh3_dxA_f + dh3_dxA_g @ u + dh3_dxB @ target.xdot(target.U) >= -ah3 - delta3]
+            const += [dh1_dxA_f + dh1_dxA_g @ u + dh1_dxB_target_xdot >= -ah1 - delta1 ]
+            const += [dh2_dxA_f + dh2_dxA_g @ u + dh2_dxB_target_xdot >= -ah2 - delta2]
+            const += [dh3_dxA_f + dh3_dxA_g @ u + dh3_dxB_target_xdot >= -ah3 - delta3]
             const += [delta1 >= 0]
             const += [delta2 >= 0]
             const += [delta3 >= 0]
@@ -289,10 +240,10 @@ class Actor:
             const_index.append(0)
 
             # Now get gradients of all the constraints
-            loss1 = dh1_dxA_f + dh1_dxB @ target.xdot(target.U) + ah1
-            loss2 = dh2_dxA_f + dh2_dxB @ target.xdot(target.U) + ah2 
-            loss3 = dh3_dxA_f + dh3_dxB @ target.xdot(target.U) + ah3
-            loss4 = -dV_dxA_f - dV_dxB @ target.xdot(target.U) - kV
+            loss1 = dh1_dxA_f + dh1_dxB_target_xdot + ah1
+            loss2 = dh2_dxA_f + dh2_dxB_target_xdot + ah2 
+            loss3 = dh3_dxA_f + dh3_dxB_target_xdot + ah3
+            loss4 = -dV_dxA_f - dV_dxB_target_xdot - kV
 
             if loss1.detach().numpy()<-0.01 or loss2.detach().numpy()<-0.01 or loss2.detach().numpy()<-0.01:
                 print("ERROR")
@@ -518,6 +469,7 @@ def train(args):
             # print("alpha1_1 grad solution", alpha1_grad_1, alpha2_grad_1, alpha3_grad_1)
             # print("u grad",u.grad)
             # print("x grad solution", x.grad)
+
 
             # reward = rewards[-1].sum()
             # reward.backward(retain_graph=True)

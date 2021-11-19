@@ -1,5 +1,6 @@
 import numpy as np
 import cvxpy as cp
+from cvxpylayers.torch import CvxpyLayer
 import torch
 # import math
 
@@ -10,7 +11,9 @@ def fx_(x):
     # return torch.tensor(np.array([0.0,0.0,0.0]).reshape(-1,1)*dt,dtype=torch.float)
 
 def gx_(x):
+    print("theta",torch.cos(x[2,0]))
     g1 = torch.cat( ( torch.cos(x[2,0]).reshape(-1,1),torch.tensor([[0]]) ), axis=1 )
+    print("g1",g1)
     g2 = torch.cat( ( torch.tensor([[0]]), torch.sin(x[2,0]).reshape(-1,1) ), axis=1 )
     g3 = torch.tensor([[0,1]],dtype=torch.float)
     g_ = torch.cat((g1,g2,g3))*dt
@@ -39,6 +42,56 @@ def dgxu_dx_(x, u, type='tensor'):
         return dgxudx.detach().numpy()
     if type == 'tensor':
         return dgxudx
+    
+    
+# Define CVX TORCH controller
+
+u = cp.Variable((2,1))
+delta = cp.Variable(1)
+
+ah1 = cp.Parameter(1)
+dh1_dxA_f = cp.Parameter(1)
+dh1_dxA_g = cp.Parameter((1,2))
+dh1_dxB_target_xdot = cp.Parameter(1) #cp.Parameter((1,2))
+
+ah2 = cp.Parameter(1)
+dh2_dxA_f = cp.Parameter(1)
+dh2_dxA_g = cp.Parameter((1,2))
+dh2_dxB_target_xdot = cp.Parameter(1) #cp.Parameter((1,2))
+
+ah3 = cp.Parameter(1)
+dh3_dxA_f = cp.Parameter(1)
+dh3_dxA_g = cp.Parameter((1,2))
+dh3_dxB_target_xdot = cp.Parameter(1) #cp.Parameter((1,2))
+
+kV = cp.Parameter(1)
+dV_dxA_f = cp.Parameter(1)
+dV_dxA_g = cp.Parameter((1,2))
+dV_dxB_target_xdot = cp.Parameter(1) #cp.Parameter((1,2))
+
+U_d = cp.Parameter((2,1))
+x = cp.Parameter((3,1))
+
+# Target xdot parameter
+target_xdot = cp.Parameter((2,1))
+
+# QP objective
+objective = cp.Minimize(cp.sum_squares(u-U_d) + 100*delta)
+
+# CLF constraint
+const = [dV_dxA_f + dV_dxA_g @ u + dV_dxB_target_xdot <= -kV + delta]
+const += [delta>=0]
+
+# CBF constraints
+const += [dh1_dxA_f + dh1_dxA_g @ u + dh1_dxB_target_xdot >= -ah1 ]
+const += [dh2_dxA_f + dh2_dxA_g @ u + dh2_dxB_target_xdot >= -ah2 ]
+const += [dh3_dxA_f + dh3_dxA_g @ u + dh3_dxB_target_xdot >= -ah3 ]
+# const += [alpha >= -20]
+problem = cp.Problem(objective,const)
+assert problem.is_dpp()
+
+cvxpylayer = CvxpyLayer(problem, parameters=[U_d, ah1,dh1_dxA_f, dh1_dxA_g,dh1_dxB_target_xdot, ah2,dh2_dxA_f, dh2_dxA_g,dh2_dxB_target_xdot, ah3,dh3_dxA_f,dh3_dxA_g,dh3_dxB_target_xdot,  kV,dV_dxA_f,dV_dxA_g,dV_dxB_target_xdot  ], variables=[u])
+
 
 class Unicycle2D:
     
