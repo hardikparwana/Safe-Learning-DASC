@@ -6,6 +6,9 @@ This repository implements our ICRA 2022 submission on
 
 Authors: Hardik Parwana and Dimitra Panagou, University of Michigan
 
+An early access version can be found at
+https://arxiv.org/abs/2109.10949
+
 Note: this repo is under development. While all the relevant code is present, we will work on making it more readable and customizable soon! Stay Tuned!
 
 ## Description
@@ -28,7 +31,7 @@ The code was run on Ubuntu 20 with Python 3.6 and following packages
 - matplotlib==3.3.4
 - numpy==1.19.5
 
-To run the code, run `source export_setup.sh` from main folder
+In addition to above dependencies, run `source export_setup.sh` from main folder to set the paths required to access submodules.
 
 # 1D Autonomous Car
 To examine how the car behaves with different values of parameters, see our notebook example **car_example.ipynb**.
