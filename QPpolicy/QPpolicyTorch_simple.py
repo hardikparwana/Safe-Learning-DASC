@@ -34,10 +34,10 @@ class Actor:
         self.horizon = horizon
         self.beta = beta
 
-        self.alpha1_tch = [torch.tensor([self.alpha1_nominal], requires_grad=True, dtype=torch.float)]
-        self.alpha2_tch = [torch.tensor([self.alpha2_nominal], requires_grad=True, dtype=torch.float)]
-        self.alpha3_tch = [torch.tensor([self.alpha3_nominal], requires_grad=True, dtype=torch.float)]
-        self.k_tch  = [torch.tensor(self.k_nominal, requires_grad=True, dtype=torch.float)]
+        self.alpha1_tch = torch.tensor([self.alpha1_nominal], requires_grad=True, dtype=torch.float)
+        self.alpha2_tch = torch.tensor([self.alpha2_nominal], requires_grad=True, dtype=torch.float)
+        self.alpha3_tch = torch.tensor([self.alpha3_nominal], requires_grad=True, dtype=torch.float)
+        self.k_tch  = torch.tensor(self.k_nominal, requires_grad=True, dtype=torch.float)
         # self.ud_tch = []        
 
         # for _ in range(horizon):
@@ -53,10 +53,10 @@ class Actor:
         self.ud_grad_sum = [0,0]
 
     def resetParams(self):
-        self.alpha1_tch = [torch.tensor(self.alpha1_nominal, requires_grad=True, dtype=torch.float)]
-        self.alpha2_tch = [torch.tensor(self.alpha2_nominal, requires_grad=True, dtype=torch.float)]
-        self.alpha3_tch = [torch.tensor(self.alpha3_nominal, requires_grad=True, dtype=torch.float)]
-        self.k_tch  = [torch.tensor(self.k_nominal, requires_grad=True, dtype=torch.float)]
+        self.alpha1_tch = torch.tensor(self.alpha1_nominal, requires_grad=True, dtype=torch.float)
+        self.alpha2_tch = torch.tensor(self.alpha2_nominal, requires_grad=True, dtype=torch.float)
+        self.alpha3_tch = torch.tensor(self.alpha3_nominal, requires_grad=True, dtype=torch.float)
+        self.k_tch  = torch.tensor(self.k_nominal, requires_grad=True, dtype=torch.float)
         # for i in range(self.horizon):
         #     self.ud_tch[i] = torch.tensor(self.ud_nominal[i], requires_grad=True, dtype=torch.float)
         self.index_tensors = []
@@ -71,6 +71,7 @@ class Actor:
         
         #agent nominal velocity
         U_d_ = agent.nominal_controller_tensor(X,target)
+        # print("U_d",U_d_)
         
         #target tensor
         target_xdot_ = target.xdot(target.U)
@@ -90,20 +91,11 @@ class Actor:
         # # self.alpha1_grad_sum += alpha1_grad
         # print("alpha1 grad policy", alpha1_grad)
 
-        alpha1_tch = self.alpha1_tch[-1] + 0
-        alpha2_tch = self.alpha2_tch[-1] + 0
-        alpha3_tch = self.alpha3_tch[-1] + 0
-        k_tch = self.k_tch[-1] + 0
-        alpha1_tch.retain_grad()
-        alpha2_tch.retain_grad()
-        alpha3_tch.retain_grad()
-        k_tch.retain_grad()
-        # u_tch = self.ud_tch[-1] + 0
-        ah1_ = alpha1_tch*h1_  
-        ah2_ = alpha2_tch*h2_  
-        ah3_ = alpha3_tch*h3_  
+        ah1_ = self.alpha1_tch*h1_  
+        ah2_ = self.alpha2_tch*h2_  
+        ah3_ = self.alpha3_tch*h3_  
         # print("ah1", ah1_)
-        kV_ = k_tch * V_       
+        kV_ = self.k_tch * V_       
 
         solver_args = {
             'verbose': False,
@@ -117,7 +109,7 @@ class Actor:
             # ssum = self.alpha1_tch[-1].sum()
             ssum.backward(retain_graph=True)
             # grad1_temp = self.alpha1_tch[0].grad.detach().numpy()[0]-self.alpha1_grad_sum
-            grad1_temp = alpha1_tch.grad.detach().numpy()[0]
+            grad1_temp = self.alpha1_tch.grad.detach().numpy()[0]
             self.alpha1_grad_sum = self.alpha1_grad_sum + grad1_temp
             # print("ussum grad 1", grad1_temp)
 
@@ -132,7 +124,7 @@ class Actor:
                 print("ERROR")
 
             loss1.backward(retain_graph=True)       
-            grad1 = [self.alpha1_tch[0].grad.detach().numpy()[0]-self.alpha1_grad_sum, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum, self.alpha3_tch[0].grad.detach().numpy()[0]-self.alpha3_grad_sum, self.k_tch[0].grad.detach().numpy()-self.k_grad_sum]#, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum]
+            grad1 = [self.alpha1_tch.grad.detach().numpy()[0]-self.alpha1_grad_sum, self.alpha2_tch.grad.detach().numpy()[0]-self.alpha2_grad_sum, self.alpha3_tch.grad.detach().numpy()[0]-self.alpha3_grad_sum, self.k_tch.grad.detach().numpy()-self.k_grad_sum]#, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum]
             self.alpha1_grad_sum = self.alpha1_grad_sum + grad1[0]
             self.alpha2_grad_sum = self.alpha2_grad_sum + grad1[1]
             self.alpha3_grad_sum = self.alpha3_grad_sum + grad1[2]
@@ -146,7 +138,7 @@ class Actor:
 
             # s_time = time.time()
             loss2.backward(retain_graph=True)            
-            grad2 = [self.alpha1_tch[0].grad.detach().numpy()[0]-self.alpha1_grad_sum, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum, self.alpha3_tch[0].grad.detach().numpy()[0]-self.alpha3_grad_sum, self.k_tch[0].grad.detach().numpy()-self.k_grad_sum]#, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum]
+            grad2 = [self.alpha1_tch.grad.detach().numpy()[0]-self.alpha1_grad_sum, self.alpha2_tch.grad.detach().numpy()[0]-self.alpha2_grad_sum, self.alpha3_tch.grad.detach().numpy()[0]-self.alpha3_grad_sum, self.k_tch.grad.detach().numpy()-self.k_grad_sum]#, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum]
             # print("One time ", time.time()-s_time)
             self.alpha1_grad_sum = self.alpha1_grad_sum + grad2[0]
             self.alpha2_grad_sum = self.alpha2_grad_sum + grad2[1]
@@ -155,7 +147,7 @@ class Actor:
             # print("GRAD2",grad2)
 
             loss3.backward(retain_graph=True)            
-            grad3 = [self.alpha1_tch[0].grad.detach().numpy()[0]-self.alpha1_grad_sum, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum, self.alpha3_tch[0].grad.detach().numpy()[0]-self.alpha3_grad_sum, self.k_tch[0].grad.detach().numpy()-self.k_grad_sum]#, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum]
+            grad3 = [self.alpha1_tch.grad.detach().numpy()[0]-self.alpha1_grad_sum, self.alpha2_tch.grad.detach().numpy()[0]-self.alpha2_grad_sum, self.alpha3_tch.grad.detach().numpy()[0]-self.alpha3_grad_sum, self.k_tch.grad.detach().numpy()-self.k_grad_sum]#, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum]
             self.alpha1_grad_sum = self.alpha1_grad_sum + grad3[0]
             self.alpha2_grad_sum = self.alpha2_grad_sum + grad3[1]
             self.alpha3_grad_sum = self.alpha3_grad_sum + grad3[2]
@@ -163,7 +155,7 @@ class Actor:
             # print("GRAD3",grad3)
 
             loss4.backward(retain_graph=True)            
-            grad4 = [self.alpha1_tch[0].grad.detach().numpy()[0]-self.alpha1_grad_sum, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum, self.alpha3_tch[0].grad.detach().numpy()[0]-self.alpha3_grad_sum, self.k_tch[0].grad.detach().numpy()-self.k_grad_sum]#, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum]
+            grad4 = [self.alpha1_tch.grad.detach().numpy()[0]-self.alpha1_grad_sum, self.alpha2_tch.grad.detach().numpy()[0]-self.alpha2_grad_sum, self.alpha3_tch.grad.detach().numpy()[0]-self.alpha3_grad_sum, self.k_tch.grad.detach().numpy()-self.k_grad_sum]#, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum]
             self.alpha1_grad_sum = self.alpha1_grad_sum + grad4[0]
             self.alpha2_grad_sum = self.alpha2_grad_sum + grad4[1]
             self.alpha3_grad_sum = self.alpha3_grad_sum + grad4[2]
@@ -174,10 +166,7 @@ class Actor:
             
             self.index_tensors.append(loss3.detach().numpy()[0])
             self.index_tensors.append(loss4.detach().numpy()[0])
-            self.alpha1_tch.append(alpha1_tch)
-            self.alpha2_tch.append(alpha2_tch)
-            self.alpha3_tch.append(alpha3_tch)
-            self.k_tch.append(k_tch)
+            
             self.index_tensor_grads.append(grad1)
             self.index_tensor_grads.append(grad2)
             self.index_tensor_grads.append(grad3)
@@ -249,7 +238,7 @@ class Actor:
                 print("ERROR")
 
             loss1.backward(retain_graph=True)            
-            grad1 = [self.alpha1_tch[0].grad.detach().numpy()[0]-self.alpha1_grad_sum, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum, self.alpha3_tch[0].grad.detach().numpy()[0]-self.alpha3_grad_sum, self.k_tch[0].grad.detach().numpy()-self.k_grad_sum]#, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum]
+            grad1 = [self.alpha1_tch.grad.detach().numpy()[0]-self.alpha1_grad_sum, self.alpha2_tch.grad.detach().numpy()[0]-self.alpha2_grad_sum, self.alpha3_tch.grad.detach().numpy()[0]-self.alpha3_grad_sum, self.k_tch.grad.detach().numpy()-self.k_grad_sum]#, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum]
             self.alpha1_grad_sum = self.alpha1_grad_sum + grad1[0]
             self.alpha2_grad_sum = self.alpha2_grad_sum + grad1[1]
             self.alpha3_grad_sum = self.alpha3_grad_sum + grad1[2]
@@ -258,21 +247,21 @@ class Actor:
             # print(grad1)
 
             loss2.backward(retain_graph=True)            
-            grad2 = [self.alpha1_tch[0].grad.detach().numpy()[0]-self.alpha1_grad_sum, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum, self.alpha3_tch[0].grad.detach().numpy()[0]-self.alpha3_grad_sum, self.k_tch[0].grad.detach().numpy()-self.k_grad_sum]#, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum]
+            grad2 = [self.alpha1_tch.grad.detach().numpy()[0]-self.alpha1_grad_sum, self.alpha2_tch.grad.detach().numpy()[0]-self.alpha2_grad_sum, self.alpha3_tch.grad.detach().numpy()[0]-self.alpha3_grad_sum, self.k_tch.grad.detach().numpy()-self.k_grad_sum]#, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum]
             self.alpha1_grad_sum = self.alpha1_grad_sum + grad2[0]
             self.alpha2_grad_sum = self.alpha2_grad_sum + grad2[1]
             self.alpha3_grad_sum = self.alpha3_grad_sum + grad2[2]
             self.k_grad_sum = self.k_grad_sum + grad2[3]
 
             loss3.backward(retain_graph=True)            
-            grad3 = [self.alpha1_tch[0].grad.detach().numpy()[0]-self.alpha1_grad_sum, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum, self.alpha3_tch[0].grad.detach().numpy()[0]-self.alpha3_grad_sum, self.k_tch[0].grad.detach().numpy()-self.k_grad_sum]#, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum]
+            grad3 = [self.alpha1_tch.grad.detach().numpy()[0]-self.alpha1_grad_sum, self.alpha2_tch.grad.detach().numpy()[0]-self.alpha2_grad_sum, self.alpha3_tch.grad.detach().numpy()[0]-self.alpha3_grad_sum, self.k_tch.grad.detach().numpy()-self.k_grad_sum]#, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum]
             self.alpha1_grad_sum = self.alpha1_grad_sum + grad3[0]
             self.alpha2_grad_sum = self.alpha2_grad_sum + grad3[1]
             self.alpha3_grad_sum = self.alpha3_grad_sum + grad3[2]
             self.k_grad_sum = self.k_grad_sum + grad3[3]
 
             loss4.backward(retain_graph=True)            
-            grad4 = [self.alpha1_tch[0].grad.detach().numpy()[0]-self.alpha1_grad_sum, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum, self.alpha3_tch[0].grad.detach().numpy()[0]-self.alpha3_grad_sum, self.k_tch[0].grad.detach().numpy()-self.k_grad_sum]#, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum]
+            grad4 = [self.alpha1_tch.grad.detach().numpy()[0]-self.alpha1_grad_sum, self.alpha2_tch.grad.detach().numpy()[0]-self.alpha2_grad_sum, self.alpha3_tch.grad.detach().numpy()[0]-self.alpha3_grad_sum, self.k_tch.grad.detach().numpy()-self.k_grad_sum]#, self.alpha2_tch[0].grad.detach().numpy()[0]-self.alpha2_grad_sum]
             self.alpha1_grad_sum = self.alpha1_grad_sum + grad4[0]
             self.alpha2_grad_sum = self.alpha2_grad_sum + grad4[1]
             self.alpha3_grad_sum = self.alpha3_grad_sum + grad4[2]
@@ -282,11 +271,6 @@ class Actor:
             self.index_tensors.append(loss2.detach().numpy()[0])            
             self.index_tensors.append(loss3.detach().numpy()[0])
             self.index_tensors.append(loss4.detach().numpy()[0])
-            
-            self.alpha1_tch.append(alpha1_tch)
-            self.alpha2_tch.append(alpha2_tch)
-            self.alpha3_tch.append(alpha3_tch)
-            self.k_tch.append(k_tch)
             
             self.index_tensor_grads.append(grad1)
             self.index_tensor_grads.append(grad2)
@@ -315,10 +299,10 @@ class Actor:
         objective_tensor.backward(retain_graph=True)
 
         # Get Gradients
-        alpha1_grad = self.alpha1_tch[0].grad.detach().numpy() - self.alpha1_grad_sum
-        alpha2_grad = self.alpha2_tch[0].grad.detach().numpy() - self.alpha2_grad_sum
-        alpha3_grad = self.alpha3_tch[0].grad.detach().numpy() - self.alpha3_grad_sum
-        k_grad = self.k_tch[0].grad.detach().numpy() - self.k_grad_sum
+        alpha1_grad = self.alpha1_tch.grad.detach().numpy() - self.alpha1_grad_sum
+        alpha2_grad = self.alpha2_tch.grad.detach().numpy() - self.alpha2_grad_sum
+        alpha3_grad = self.alpha3_tch.grad.detach().numpy() - self.alpha3_grad_sum
+        k_grad = self.k_tch.grad.detach().numpy() - self.k_grad_sum
 
         self.alpha1_grad_sum = self.alpha1_grad_sum + alpha1_grad
         self.alpha2_grad_sum = self.alpha2_grad_sum + alpha2_grad
@@ -533,7 +517,7 @@ parser.add_argument('--max-steps', type=int, default=200, metavar='N',help='maxi
 parser.add_argument('--total-episodes', type=int, default=10, metavar='N',help='total training episodes') #1000
 parser.add_argument('--policy-freq', type=int, default=500, metavar='N',help='update frequency of target network ')
 parser.add_argument('--start-timestep', type=int, default=10000, metavar='N',help='number of steps using random policy')
-parser.add_argument('--horizon', type=int, default=20, metavar='N',help='RL time horizon') #3
+parser.add_argument('--horizon', type=int, default=50, metavar='N',help='RL time horizon') #3
 parser.add_argument('--alpha', type=float, default=0.15, metavar='G',help='CBF parameter')  #0.003
 parser.add_argument('--alpha1', type=float, default=1.0, metavar='G',help='CBF parameter')  #0.003
 parser.add_argument('--alpha2', type=float, default=0.7, metavar='G',help='CBF parameter')  #0.003

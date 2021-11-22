@@ -11,9 +11,9 @@ def fx_(x):
     # return torch.tensor(np.array([0.0,0.0,0.0]).reshape(-1,1)*dt,dtype=torch.float)
 
 def gx_(x):
-    print("theta",torch.cos(x[2,0]))
+    # print("theta",torch.cos(x[2,0]))
     g1 = torch.cat( ( torch.cos(x[2,0]).reshape(-1,1),torch.tensor([[0]]) ), axis=1 )
-    print("g1",g1)
+    # print("g1",g1)
     g2 = torch.cat( ( torch.tensor([[0]]), torch.sin(x[2,0]).reshape(-1,1) ), axis=1 )
     g3 = torch.tensor([[0,1]],dtype=torch.float)
     g_ = torch.cat((g1,g2,g3))*dt
@@ -508,9 +508,9 @@ class Unicycle2D:
 
     def nominal_controller_tensor(self, X, target):
         #simple controller for now: considers estimated disturbance
-
+        # print(X,target.X)
         #Define gamma for the Lyapunov function
-        k_omega = 0.0#2.5
+        k_omega = 2.5
         k_v = 0.5
         targetX = torch.tensor(target.X,dtype=torch.float)
         diff = targetX[:,0] - X[0:2,0]
