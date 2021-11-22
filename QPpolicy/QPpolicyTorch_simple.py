@@ -508,7 +508,7 @@ def train(args):
 parser = argparse.ArgumentParser(description='td3')
 parser.add_argument('--env-name', default="UnicycleFollower")
 parser.add_argument('--gamma', type=float, default=0.99,metavar='G',help='discounted factor')
-parser.add_argument('--lr_actor', type=float, default=0.03, metavar='G',help='learning rate of actor')  #0.003
+parser.add_argument('--lr_actor', type=float, default=0.06, metavar='G',help='learning rate of actor')  #0.003
 parser.add_argument('--lr-critic', type=float, default=0.03, metavar='G',help='learning rate of critic') #0.003
 parser.add_argument('--plot_freq', type=float, default=1, metavar='G',help='plotting frequency')
 parser.add_argument('--batch-size', type=int, default=10, metavar='N', help='batch size (default: 256)') #100
