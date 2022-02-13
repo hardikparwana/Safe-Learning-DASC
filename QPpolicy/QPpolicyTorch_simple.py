@@ -103,8 +103,9 @@ class Actor:
         }
 
         try:
+            print("HELLO")
             solution, = cvxpylayer(U_d_, ah1_,dh1_dxA_f_, dh1_dxA_g_,dh1_dxB_target_xdot_, ah2_,dh2_dxA_f_, dh2_dxA_g_,dh2_dxB_target_xdot_, ah3_,dh3_dxA_f_, dh3_dxA_g_, dh3_dxB_target_xdot_,  kV_,dV_dxA_f_,dV_dxA_g_ ,dV_dxB_target_xdot_, solver_args=solver_args)
-
+            print("DONE")
             ssum = solution.sum()
             # ssum = self.alpha1_tch[-1].sum()
             ssum.backward(retain_graph=True)

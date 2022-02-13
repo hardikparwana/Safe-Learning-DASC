@@ -71,6 +71,9 @@ class SingleIntegrator:
 
     def xdot(self,U):
         return torch.tensor( self.f + self.g @ U, dtype=torch.float )
+    
+    def xdotTensor(X,U):
+        return fx_(X) + gx_(X) @ U
 
     def agentBarrier(self,target,min_D):
         # min distance

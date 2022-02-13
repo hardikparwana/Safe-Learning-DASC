@@ -2,9 +2,14 @@ import numpy as np
 import cvxpy as cp
 from cvxpylayers.torch import CvxpyLayer
 import torch
+from tensor_utils import wrap_angle_tensor
 # import math
 
 dt = 0.01
+
+FoV_angle = 60*np.pi/180
+max_D = 3
+min_D = 0.3
 
 def fx_(x):
     return x + torch.tensor(np.array([0.0,0.0,0.0]).reshape(-1,1)*dt,dtype=torch.float)
@@ -91,7 +96,6 @@ problem = cp.Problem(objective,const)
 assert problem.is_dpp()
 
 cvxpylayer = CvxpyLayer(problem, parameters=[U_d, ah1,dh1_dxA_f, dh1_dxA_g,dh1_dxB_target_xdot, ah2,dh2_dxA_f, dh2_dxA_g,dh2_dxB_target_xdot, ah3,dh3_dxA_f,dh3_dxA_g,dh3_dxB_target_xdot,  kV,dV_dxA_f,dV_dxA_g,dV_dxB_target_xdot  ], variables=[u])
-
 
 class Unicycle2D:
     
@@ -256,6 +260,17 @@ class Unicycle2D:
         
         return h, dh_dx_agent @ self.fx(x), dh_dx_agent @ self.gx(x), dh_dx_target  #h_dot_A, h_dot_B
 
+    def CBF1_loss_tensor_simple(x, targetX):
+
+        # print("1loss ",torch.square(torch.norm( x[0:2] - targetX )))
+        h = max_D**2 - torch.reshape(torch.square(torch.norm( x[0:2] - targetX )),(1,1))
+        dh_dx_agent = torch.cat( ( -2*( x[0:2] - targetX ), torch.tensor([[0.0]]) ), 0).T
+        dh_dx_target =  2*( x[0:2] - targetX).T
+        # print(f"1: {self.max_D}, x:{x}, tX:{targetX}, {torch.norm( x[0:2,0] - targetX )}, diff:{x[0:2] - targetX}, diff2:{x[0:2,0] - targetX[:,0]}")
+        
+        return h, dh_dx_agent @ fx_(x), dh_dx_agent @ gx_(x), dh_dx_target  #h_dot_A, h_dot_B
+
+
     def CBF1_sim_loss(self,Fx,Tx):
         h = self.max_D**2 - np.linalg.norm( Fx[0:2,0] - Tx[:,0] )**2
         dh_dx_agent = np.append(- 2*( Fx[0:2,0] - Tx[:,0] ),0)
@@ -283,6 +298,13 @@ class Unicycle2D:
         dh_dx_target = - 2*( x[0:2] - targetX).T
 
         return h, dh_dx_agent @ self.fx(x), dh_dx_agent @ self.gx(x), dh_dx_target #h_dot_A, h_dot_B
+
+    def CBF2_loss_tensor_simple(x, targetX):
+        h = torch.reshape(torch.square(torch.norm( x[0:2] - targetX )),(1,1)) - min_D**2
+        dh_dx_agent = torch.cat( ( 2*( x[0:2] - targetX ), torch.tensor([[0.0]]) ), 0).T
+        dh_dx_target = - 2*( x[0:2] - targetX).T
+
+        return h, dh_dx_agent @ fx_(x), dh_dx_agent @ gx_(x), dh_dx_target #h_dot_A, h_dot_B
 
     def CBF2_sim_loss(self,Fx,Tx):
         h = np.linalg.norm( Fx[0:2,0] - Tx[:,0] )**2 - self.min_D**2
@@ -385,6 +407,23 @@ class Unicycle2D:
 
         return h, dh_dx_agent/(1.0-np.cos(self.FoV_angle/2)) @ self.fx(x), dh_dx_agent/(1.0-np.cos(self.FoV_angle/2)) @ self.gx(x), dh_dx_target/(1.0-np.cos(self.FoV_angle/2)) #h_dot_A, h_dot_B
 
+    def CBF3_loss_tensor_simple(x,targetX):
+           
+        p = targetX - x[0:2]
+
+        # dir_vector = torch.tensor([[torch.cos(x[2,0])],[torch.sin(x[2,0])]]) # column vector
+        dir_vector = torch.cat( ( torch.cos(x[2,0]).reshape(-1,1), torch.sin(x[2,0]).reshape(-1,1) ) )
+        bearing_angle  = torch.matmul(dir_vector.T , p )/ torch.norm(p)
+        h = (bearing_angle - np.cos(FoV_angle/2))/(1.0-np.cos(FoV_angle/2))
+
+        norm_p = torch.norm(p)
+        dh_dx = dir_vector/norm_p - ( ( torch.matmul(dir_vector.T , p) ) * p )/torch.pow(norm_p,3)    
+        dh_dTheta = torch.reshape( ( -torch.sin(x[2]) * p[0] + torch.cos(x[2]) * p[1] ),(1,1) )/torch.norm(p)
+        dh_dx_agent = torch.cat(  ( -dh_dx , dh_dTheta),0  ).T
+        dh_dx_target = dh_dx.T
+
+        return h, dh_dx_agent/(1.0-np.cos(FoV_angle/2)) @ fx_(x), dh_dx_agent/(1.0-np.cos(FoV_angle/2)) @ gx_(x), dh_dx_target/(1.0-np.cos(FoV_angle/2)) #h_dot_A, h_dot_B
+
 
     def CBF3_loss_cp_v2(self,x,target):
         # print(type(x))
@@ -444,6 +483,18 @@ class Unicycle2D:
         dV_dx_target = -factor.T
 
         return V, dV_dx_agent @ self.fx(x), dV_dx_agent @ self.gx(x), dV_dx_target 
+    
+    def CLF_loss_tensor_simple(x,targetX):
+            
+        avg_D = (min_D + max_D)/2.0
+        V = torch.reshape(torch.pow(torch.norm(targetX)- avg_D,2),(1,1))
+
+        p = targetX - x[0:2]
+        factor = 2*(torch.norm( p ) - avg_D)/torch.norm(p) * ( -p )
+        dV_dx_agent = torch.cat( ( factor , torch.tensor([[0]]))  , 0 ).T
+        dV_dx_target = -factor.T
+
+        return V, dV_dx_agent @ fx_(x), dV_dx_agent @ gx_(x), dV_dx_target 
 
     def nominal_controller_old(self,target):
         #simple controller for now: does not consider disturbance
@@ -520,6 +571,27 @@ class Unicycle2D:
 
         omega = k_omega*error_theta 
         v = k_v*( torch.norm(diff) - self.min_D) * torch.cos( error_theta )
+
+        v = v.reshape(-1,1)
+        omega = omega.reshape(-1,1)
+        U = torch.cat((v,omega))
+        return U
+    
+    # @staticmethod
+    def nominal_controller_tensor2(X, targetX):
+        #simple controller for now: considers estimated disturbance
+        # print(X,target.X)
+        #Define gamma for the Lyapunov function
+        k_omega = 2.5
+        k_v = 0.5
+        # targetX = torch.tensor(target.X,dtype=torch.float)
+        diff = targetX[:,0] - X[0:2,0]
+
+        theta_d = torch.atan2(targetX[1,0]-X[1,0],targetX[0,0]-X[0,0])
+        error_theta = wrap_angle_tensor( theta_d - X[2,0] )
+
+        omega = k_omega*error_theta 
+        v = k_v*( torch.norm(diff) - min_D) * torch.cos( error_theta )
 
         v = v.reshape(-1,1)
         omega = omega.reshape(-1,1)

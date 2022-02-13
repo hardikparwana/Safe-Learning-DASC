@@ -7,7 +7,7 @@ from numpy.core.fromnumeric import trace
 import torch
 import cvxpy as cp
 from cvxpylayers.torch import CvxpyLayer
-
+  
 import signal
 signal.signal(signal.SIGINT, signal.SIG_DFL)
 
@@ -98,7 +98,7 @@ class Actor:
         dh3_dxA_g = cp.Parameter((1,2))
         dh3_dxB = cp.Parameter((1,2))
 
-        kV = cp.Parameter(1)
+        kV = cp.Parameter(1) 
         dV_dxA_f = cp.Parameter(1)
         dV_dxA_g = cp.Parameter((1,2))
         dV_dxB = cp.Parameter((1,2))
@@ -518,6 +518,7 @@ def train(args):
             # print("alpha1_1 grad solution", alpha1_grad_1, alpha2_grad_1, alpha3_grad_1)
             # print("u grad",u.grad)
             # print("x grad solution", x.grad)
+
 
             # reward = rewards[-1].sum()
             # reward.backward(retain_graph=True)
