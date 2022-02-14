@@ -119,6 +119,7 @@ class horizonControl(nn.Module):
 		
 		# s_time = time.time()
 		x1 = dynam(x_agent,u0)
+        r1
 		# print("Time: ", time.time()-s_time)
 
 		#Time 2: 
