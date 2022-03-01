@@ -69,6 +69,7 @@ def updateParameterPerformance(mpc,params,beta,rewards,cons):
 
     ### Find constrained directions       
     for index, value in enumerate(cons):
+        if value.detach().numpy()[0]<0.5:
              value.sum().backward(retain_graph=True)
              curr_cons = value.detach().numpy()[0] if value.detach().numpy()[0]>0.0 else 0.0
              grads = getParamGrads(mpc)
@@ -104,6 +105,7 @@ def updateParameterFeasibility(mpc,params,beta,feasible_cons,infeasible_cons):
     
     ### Find constrained directions       
     for index, value in enumerate(feasible_cons):
+        if value.detach().numpy()[0]<1.0:
              value.sum().backward(retain_graph=True)
              curr_cons = value.detach().numpy()[0] if value.detach().numpy()[0]>0.0 else 0.0
              grads = getParamGrads(mpc)
@@ -363,3 +365,4 @@ parser.add_argument('--animate_horizon', type=bool, default=False)
 
 args = parser.parse_args("")
 train(args)
+
