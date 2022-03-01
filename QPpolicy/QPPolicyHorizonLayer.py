@@ -323,8 +323,8 @@ def train(args):
             else:
                 exit()
         
-        if len(u)>0:
-            # print(f"u:{u[0].detach().numpy()}")
+        if len(u)==args.horizon:
+            print(f"u:{u[0].detach().numpy()}")
             # Move agent one step        
             agentF.step(u[0].detach().numpy())  
             agentT.step(TUs[0][0],TUs[0][1]) 
@@ -355,7 +355,7 @@ parser.add_argument('--alpha2', type=float, default=0.7, metavar='G',help='CBF p
 parser.add_argument('--alpha3', type=float, default=0.7, metavar='G',help='CBF parameter')  
 parser.add_argument('--k', type=float, default=0.1, metavar='G',help='CLF parameter') 
 parser.add_argument('--episodes', type=int, default=200, metavar='N',help='total training episodes') 
-parser.add_argument('--horizon', type=int, default=10, metavar='N',help='total training episodes')
+parser.add_argument('--horizon', type=int, default=5, metavar='N',help='total training episodes')
 parser.add_argument('--lr_beta', type=float, default=1.0, metavar='G',help='learning rate of parameter')  #0.003
 parser.add_argument('--dt', type=float, default="0.01")
 parser.add_argument('--animate_episode', type=bool, default=True)

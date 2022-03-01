@@ -11,7 +11,7 @@ FoV_angle = 60*np.pi/180
 FoV_length = 3
 max_D = 3
 min_D = 0.3
-u_max = [0.05,0.05]
+u_max = [0.5,0.5]
 
 def fx_(x):
     return x + torch.tensor(np.array([0.0,0.0,0.0]).reshape(-1,1)*dt,dtype=torch.float)
