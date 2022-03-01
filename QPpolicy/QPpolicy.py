@@ -758,7 +758,7 @@ parser.add_argument('--alpha', type=float, default=0.15, metavar='G',help='CBF p
 parser.add_argument('--k', type=float, default=0.1, metavar='G',help='CLF parameter')  #0.003
 parser.add_argument('--train', type=float, default=True, metavar='G',help='CLF parameter')  #0.003
 parser.add_argument('--movie', type=float, default=True, metavar='G',help='CLF parameter')  #0.003
-parser.add_argument('--movie_name', default="test.mp4")
+parser.add_argument('--movie_name', default="test_temp.mp4")
 args = parser.parse_args("")
 
 Alphas = [0.15]#[0.0] #0.15 #0.115
@@ -859,31 +859,31 @@ axis1[0,1].legend()
 axis1[1,1].set_title(r"$k$")
 axis1[1,1].set_xlabel('time (s)')
 
-figure1.savefig("unicycle_parameter.png")
-figure1.savefig("unicycle_parameter.eps")
+# figure1.savefig("unicycle_parameter.png")
+# figure1.savefig("unicycle_parameter.eps")
 
 # Reward Plot
 # axis2.set_title("Reward with time")#,y=1.0,pad=-14)
 axis2.set_xlabel('time (s)')
 axis2.set_xlabel('Horizon Reward with Time')
 axis2.legend()
-figure2.savefig("unicycle_reward.png")
-figure2.savefig("unicycle_reward.eps")
+# figure2.savefig("unicycle_reward.png")
+# figure2.savefig("unicycle_reward.eps")
 
 
 # Barrier Function Plots
 axis3.set_title("Barrier Functions")#,y=1.0,pad=-14)
 axis3.set_xlabel('time (s)')
 axis3.legend()
-figure3.savefig("unicycle_barrier.png")
-figure3.savefig("unicycle_barrier.eps")
+# figure3.savefig("unicycle_barrier.png")
+# figure3.savefig("unicycle_barrier.eps")
 
 axis4[0].set_title('Target Position')
 axis4[0].legend()
 axis4[1].legend()
 axis4[1].set_xlabel('time step')
-figure4.savefig("unicycle_positions.png")
-figure4.savefig("unicycle_positions.eps")
+# figure4.savefig("unicycle_positions.png")
+# figure4.savefig("unicycle_positions.eps")
 
 axis5[0].set_title('Control Inputs')
 axis5[0].legend()
@@ -891,8 +891,8 @@ axis5[0].set_ylabel('Linear Velocity')
 axis5[1].set_ylabel('Angular Velocity')
 axis5[1].legend()
 axis5[1].set_xlabel('time (s)')
-figure5.savefig("unicycle_inputs.png")
-figure5.savefig("unicycle_inputs.eps")
+# figure5.savefig("unicycle_inputs.png")
+# figure5.savefig("unicycle_inputs.eps")
 
 
 plt.show()

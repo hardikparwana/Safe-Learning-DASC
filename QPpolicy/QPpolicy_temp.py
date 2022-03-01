@@ -73,9 +73,9 @@ class Actor:
 
         epsilon = 0.9
         
-        const += [dh1_dxA @ agent.xdot(x) + dh1_dxB @ target.xdot(target.U) >= -alpha1*h1 ]#np.linalg.norm(dh1_dxA @ (agent.g+ agent.g_corrected))/epsilon]
-        const += [dh2_dxA @ agent.xdot(x) + dh2_dxB @ target.xdot(target.U) >= -alpha2*h2 ]#np.linalg.norm(dh2_dxA @ (agent.g+ agent.g_corrected))/epsilon]
-        const += [dh3_dxA @ agent.xdot(x) + dh3_dxB @ target.xdot(target.U) >= -alpha3*h3 ]#np.linalg.norm(dh3_dxA @ (agent.g+ agent.g_corrected))/epsilon]
+        const += [dh1_dxA @ agent.xdot(x) + dh1_dxB @ target.xdot(target.U) >= -alpha1*h1 + 0.001]#np.linalg.norm(dh1_dxA @ (agent.g+ agent.g_corrected))/epsilon]
+        const += [dh2_dxA @ agent.xdot(x) + dh2_dxB @ target.xdot(target.U) >= -alpha2*h2 + 0.001]#np.linalg.norm(dh2_dxA @ (agent.g+ agent.g_corrected))/epsilon]
+        const += [dh3_dxA @ agent.xdot(x) + dh3_dxB @ target.xdot(target.U) >= -alpha3*h3 + 0.001]#np.linalg.norm(dh3_dxA @ (agent.g+ agent.g_corrected))/epsilon]
         
         const += [cp.abs(x[0,0])<=self.max_action[0]  ]
         const += [cp.abs(x[1,0])<=self.max_action[1]  ]
@@ -281,6 +281,7 @@ def train(args):
         metadata = dict(title='Movie Test', artist='Matplotlib',comment='Movie support!')
         writer = FFMpegWriter(fps=15, metadata=metadata)
 
+        first_update =  False
         # with writer.saving(fig, args.movie_name, 100): 
         if 1:
             for st in range(args.max_steps):  # for each step, move 10 times??
@@ -368,9 +369,14 @@ def train(args):
                 if done:
                     print("Became Unsafe")
                     break
-
-                if (st+1) % args.horizon == 0 and st>=(args.buffer_capacity-1) and args.train==True:
+                
+                # if (st+1) % args.horizon == 0 and st>=(args.buffer_capacity-1) and args.train==True and st>=(args.max_horizon-1):
+                if st>=(args.buffer_capacity-1) and args.train==True and st>=(args.max_horizon-1):
+                    if not first_update:
+                        print(f"st:{st}, term1: {(st+1) % args.horizon}, horizon:{args.horizon}, buffer:{args.buffer_capacity}, train:{args.train}, max horixon:{args.max_horizon}")
+                        first_update = True
                     # print(len(agent.replay_memory_buffer))
+                    # print("update at: ",st)
                     reward_moving_avg.append(reward_horizon)
                     agent.learn_and_update_weights_by_multiple_shooting()
 
@@ -395,24 +401,28 @@ parser.add_argument('--lr-critic', type=float, default=0.03, metavar='G',help='l
 parser.add_argument('--plot_freq', type=float, default=1, metavar='G',help='plotting frequency')
 parser.add_argument('--seed', type=int, default=123456, metavar='N',help='random seed (default: 123456)')
 parser.add_argument('--batch-size', type=int, default=10, metavar='N', help='batch size (default: 256)') #100
-parser.add_argument('--buffer-capacity', type=int, default=20, metavar='N', help='buffer_capacity') #10
+parser.add_argument('--buffer_capacity', type=int, default=30, metavar='N', help='buffer_capacity') #10
 parser.add_argument('--max-steps', type=int, default=200, metavar='N',help='maximum number of steps of each episode') #70
 parser.add_argument('--total-episodes', type=int, default=1, metavar='N',help='total training episodes') #1000
 parser.add_argument('--policy-freq', type=int, default=500, metavar='N',help='update frequency of target network ')
 parser.add_argument('--start-timestep', type=int, default=10000, metavar='N',help='number of steps using random policy')
-parser.add_argument('--horizon', type=int, default=2, metavar='N',help='RL time horizon') #3
+parser.add_argument('--horizon', type=int, default=10, metavar='N',help='RL time horizon') #3
+parser.add_argument('--max_horizon', type=int, default=30, metavar='N',help='RL time horizon') #3
 parser.add_argument('--alpha', type=float, default=0.15, metavar='G',help='CBF parameter')  #0.003
 parser.add_argument('--k', type=float, default=0.1, metavar='G',help='CLF parameter')  #0.003
 parser.add_argument('--train', type=float, default=True, metavar='G',help='CLF parameter')  #0.003
 parser.add_argument('--movie', type=float, default=True, metavar='G',help='CLF parameter')  #0.003
-parser.add_argument('--movie_name', default="test.mp4")
+parser.add_argument('--movie_name', default="test_temp.mp4")
 args = parser.parse_args("")
 
-Alphas = [0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75]#[0.0] #0.15 #0.115
+Alphas = [0.15]#, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75]#[0.0] #0.15 #0.115
 Ks = [0.1] #0.1 #2.0
 Trains = [True, False]
-Betas = [0.8, 0.0]
+Betas = [0.0, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8]
 movie_names = ['Adaptive.mp4','Non-Adaptive.mp4']
+
+horizons = [10, 1, 2, 3, 4, 5, 10, 20, 30]
+horizons = [10, 1, 5, 10, 15, 20, 25, 30]
 
 reward_episodes = []
 reward_horizons = []
@@ -430,8 +440,8 @@ figure4, axis4 = plt.subplots(2, 1)
 
 figure5, axis5 = plt.subplots(2, 1)
 
-colors = ['purple','maroon','red','salmon','k','yellow','yellowgreen','darkgreen','teal']
-colors = ['r','g','b','k']
+colors = ['k','maroon','red','salmon','yellow','yellowgreen','darkgreen','cornflowerblue','blue']
+# colors = ['r','g','b','k','c','m']
 colors2 = colors.copy()
 colors2.reverse()
 
@@ -439,17 +449,22 @@ index = 0
 data = []
 for Alpha in Alphas:
     for K in Ks:
-        for Beta in Betas:
+        for ibeta, Beta in enumerate(Betas):
+            
             args.alpha = Alpha
             args.k = K
             args.lr_actor = Beta
             args.train = True
+            args.horizon = horizons[ibeta]
             # args.movie_name = movie_names[index]
 
             if index==0:
-                name = 'Adaptive Parameter'
+                name = 'horizon = 0'
+                args.buffer_capacity = 1
+                args.train = False
             else:
-                name = 'Constant parameter'
+                name = 'horizon = ' + str(horizons[ibeta])
+                args.buffer_capacity = args.horizon
             # name = 'test'
             
             episode_reward, moving_reward, alphas, ks, t_plot, deltas, h1s, h2s, h3s, TXs, actions, alpha1s, alpha2s, alpha3s =  train(args)
