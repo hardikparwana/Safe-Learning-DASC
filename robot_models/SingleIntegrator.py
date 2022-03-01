@@ -56,10 +56,15 @@ class SingleIntegrator:
     def render(self,body):
 
         x = np.array([self.X[0,0],self.X[1,0]])
-
         # scatter plot update
         body.set_offsets([x[0],x[1]])
-
+        return body
+    
+    def render_state(self,body,X):
+    
+        x = np.array([X[0,0],X[1,0]])
+        # scatter plot update
+        body.set_offsets([x[0],x[1]])
         return body
 
     def render_plot(self):

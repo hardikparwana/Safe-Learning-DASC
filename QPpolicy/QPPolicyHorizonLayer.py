@@ -1,15 +1,27 @@
+import time
 import torch
 import torch.nn as nn
 import numpy as np
+import argparse
+import matplotlib.pyplot as plt
+
 from robot_models.Unicycle2D import *
 from robot_models.SingleIntegrator import *
 from dynamics import *
-import time
 
 dynam = torch_dynamics.apply
 
+FoV = 60*np.pi/180
+max_D = 3
+min_D = 0.3
+
 def getGrad(param):
-    value = param.grad.detach().numpy()[0]
+    if param.grad==None:
+        return 0
+    try:
+        value = param.grad.detach().numpy()[0]
+    except:
+        value = param.grad.detach().numpy()
     param.grad = None
     return value  
 
@@ -32,8 +44,7 @@ def updateParameterPerformanceUnconstrained(mpc,params,beta,rewards,cons):
     #Get gradients    
     grads_objective = getParamGrads(mpc)  
     
-    params = params + beta*grads_objective    
-    
+    params = params + beta*grads_objective        
     return params
 
 def updateParameterPerformance(mpc,params,beta,rewards,cons):
@@ -44,33 +55,36 @@ def updateParameterPerformance(mpc,params,beta,rewards,cons):
         objective_tensor = objective_tensor + value            
     objective_tensor.backward(retain_graph=True)
     
+    print(f"Horizon Reward: {objective_tensor.detach().numpy()}")
+    
     #Get gradients    
     grads_objective = getParamGrads(mpc)    
     
     n_param = np.shape(params)[0]
     n_cons = len(cons)
-    
+
     d = cp.Variable((n_param,1))
     const = []
-    objective = cp.Minimize( grads_objective @ d  )
-    
+    objective = cp.Maximize( grads_objective @ d  )
+
     ### Find constrained directions       
     for index, value in enumerate(cons):
-             value.sum().backward()
+             value.sum().backward(retain_graph=True)
+             curr_cons = value.detach().numpy()[0] if value.detach().numpy()[0]>0.0 else 0.0
              grads = getParamGrads(mpc)
-             const += [ value + grads @ d >= 0 ]
-    
+             const += [ curr_cons + grads @ d >= 0 ]
+    const += [cp.norm(d,"inf")<=0.3]
+
     # Solve the QP         
     problem = cp.Problem(objective, const)
     problem.solve()
-    if problem.status!='optimal':
+    if problem.status in ["infeasible", "unbounded"]: #problem.status!='optimal':
         print("No Feasible Direction found!")
-        return False, 
-    
+        return False, False
+
     # Update Params         
-    params = params + beta*grads    
-    
-    return params
+    params = params + beta*d.value.reshape(1,-1)[0]        
+    return True, params
     
 def updateParameterFeasibility(mpc,params,beta,feasible_cons,infeasible_cons):
     
@@ -84,27 +98,28 @@ def updateParameterFeasibility(mpc,params,beta,feasible_cons,infeasible_cons):
     ### Objective: 
     grads_objective = np.zeros((1,n_param))
     for index, value in enumerate(infeasible_cons):
-        value.sum().backward()
+        value.sum().backward(retain_graph=True)
         grads_objective = grads_objective + getParamGrads(mpc)    
-    objective = cp.Minimize( grads_objective @ d  )
+    objective = cp.Maximize( grads_objective @ d  )
     
     ### Find constrained directions       
-    for index, value in enumerate(cons):
-             value.sum().backward()
+    for index, value in enumerate(feasible_cons):
+             value.sum().backward(retain_graph=True)
+             curr_cons = value.detach().numpy()[0] if value.detach().numpy()[0]>0.0 else 0.0
              grads = getParamGrads(mpc)
-             const += [ value + grads @ d >= 0 ]
+             const += [ curr_cons + grads @ d >= 0 ]
+    const += [cp.norm(d,"inf")<=0.3]
     
     # Solve the QP         
     problem = cp.Problem(objective, const)
     problem.solve()
     if problem.status!='optimal':
         print("No Feasible Direction found!")
-        return False, 
+        return False, False
     
     # Update Params         
-    params = params + beta*grads    
-    
-    return params
+    params = params + beta*d.value.reshape(1,-1)[0]     
+    return True, params
 
 
 class closedLoopLayer(nn.Module):
@@ -126,12 +141,18 @@ class closedLoopLayer(nn.Module):
         self.k_tch = torch.tensor(k, requires_grad=True, dtype=torch.float)
 
         self.solver_args = {
-            'verbose': False,
-            'max_iters': 1000000
+            'verbose': False#,
+            #'max_iters': 1000000
         }
+        
+    def updateParams(self,params):
+        self.alpha1_tch = torch.tensor(params[0], requires_grad=True, dtype=torch.float)
+        self.alpha2_tch = torch.tensor(params[1], requires_grad=True, dtype=torch.float)
+        self.alpha3_tch = torch.tensor(params[2], requires_grad=True, dtype=torch.float)
+        self.k_tch = torch.tensor(params[3], requires_grad=True, dtype=torch.float)
 
     def forward(self,x_agent,x_target,u_target):
-
+        
         U_d_ = self.agent_nominal_controller(x_agent,x_target)
         target_xdot_ = self.target_xdot(x_target,u_target)  ######################### target.U??
 
@@ -141,6 +162,8 @@ class closedLoopLayer(nn.Module):
         h2_,dh2_dxA_f_, dh2_dxA_g_,dh2_dxB_temp = self.CBF2_loss_tensor(x_agent,x_target)
         h3_,dh3_dxA_f_, dh3_dxA_g_,dh3_dxB_temp = self.CBF3_loss_tensor(x_agent,x_target)
 
+        # print(f"dV_dxB_temp:{dV_dxB_temp}, target_xdot_:{target_xdot_}, dV type: {target_xdot_.dtype}")
+        
         dV_dxB_target_xdot_ = dV_dxB_temp @ target_xdot_
         dh1_dxB_target_xdot_ = dV_dxB_temp @ target_xdot_
         dh2_dxB_target_xdot_ = dV_dxB_temp @ target_xdot_
@@ -151,25 +174,40 @@ class closedLoopLayer(nn.Module):
         ah3_ = self.alpha3_tch*h3_  
         kV_ = self.k_tch * V_  
 
-        # Find the controller
-        solution, = cvxpylayer(U_d_, ah1_,dh1_dxA_f_, dh1_dxA_g_,dh1_dxB_target_xdot_, ah2_,dh2_dxA_f_, dh2_dxA_g_,dh2_dxB_target_xdot_, ah3_,dh3_dxA_f_, dh3_dxA_g_, dh3_dxB_target_xdot_,  kV_,dV_dxA_f_,dV_dxA_g_ ,dV_dxB_target_xdot_, solver_args=self.solver_args)
+        try: 
+            # Find the controller
+            solution, = cvxpylayer(U_d_, ah1_,dh1_dxA_f_, dh1_dxA_g_,dh1_dxB_target_xdot_, ah2_,dh2_dxA_f_, dh2_dxA_g_,dh2_dxB_target_xdot_, ah3_,dh3_dxA_f_, dh3_dxA_g_, dh3_dxB_target_xdot_,  kV_,dV_dxA_f_,dV_dxA_g_ ,dV_dxB_target_xdot_, solver_args=self.solver_args)
 
-        # Tensors for constraint derivative
-        cbf1 = dh1_dxA_f_ + torch.matmul(dh1_dxA_g_, solution) + dh1_dxB_target_xdot_ + ah1_
-        cbf2 = dh2_dxA_f_ + dh2_dxA_g_ @ solution + dh2_dxB_target_xdot_ + ah2_ 
-        cbf3 = dh3_dxA_f_ + dh3_dxA_g_ @ solution + dh3_dxB_target_xdot_ + ah3_
-        # lyap = -dV_dxA_f_ - dV_dxA_g_ @ solution - dV_dxB_target_xdot_ - kV_ 
+            # Tensors for constraint derivative
+            cbf1 = dh1_dxA_f_ + torch.matmul(dh1_dxA_g_, solution) + dh1_dxB_target_xdot_ + ah1_
+            cbf2 = dh2_dxA_f_ + dh2_dxA_g_ @ solution + dh2_dxB_target_xdot_ + ah2_ 
+            cbf3 = dh3_dxA_f_ + dh3_dxA_g_ @ solution + dh3_dxB_target_xdot_ + ah3_
+            u11 = solution[0,0]+u_max[0]; u12 = u_max[0]-solution[0,0]
+            u21 = solution[0,1]+u_max[1]; u22 = u_max[1]-solution[0,1]
+            # lyap = -dV_dxA_f_ - dV_dxA_g_ @ solution - dV_dxB_target_xdot_ - kV_ 
 
-        return solution[0], [cbf1, cbf2, cbf3]
+            return solution[0], [cbf1, cbf2, cbf3, u11, u12, u21, u22]
+        except:
+            # Find required tensors and return them
+            # solution1, = cvxpylayer_relaxed1(U_d_, ah1_,dh1_dxA_f_, dh1_dxA_g_,dh1_dxB_target_xdot_, ah2_,dh2_dxA_f_, dh2_dxA_g_,dh2_dxB_target_xdot_, ah3_,dh3_dxA_f_, dh3_dxA_g_, dh3_dxB_target_xdot_,  kV_,dV_dxA_f_,dV_dxA_g_ ,dV_dxB_target_xdot_, solver_args=self.solver_args)
+            # solution2, = cvxpylayer_relaxed2(U_d_, ah1_,dh1_dxA_f_, dh1_dxA_g_,dh1_dxB_target_xdot_, ah2_,dh2_dxA_f_, dh2_dxA_g_,dh2_dxB_target_xdot_, ah3_,dh3_dxA_f_, dh3_dxA_g_, dh3_dxB_target_xdot_,  kV_,dV_dxA_f_,dV_dxA_g_ ,dV_dxB_target_xdot_, solver_args=self.solver_args)
+            # solution3, = cvxpylayer_relaxed3(U_d_, ah1_,dh1_dxA_f_, dh1_dxA_g_,dh1_dxB_target_xdot_, ah2_,dh2_dxA_f_, dh2_dxA_g_,dh2_dxB_target_xdot_, ah3_,dh3_dxA_f_, dh3_dxA_g_, dh3_dxB_target_xdot_,  kV_,dV_dxA_f_,dV_dxA_g_ ,dV_dxB_target_xdot_, solver_args=self.solver_args)
+
+            # Tensors for constraint derivative
+            cbf1 = dh1_dxA_f_ + dh1_dxB_target_xdot_ + ah1_
+            cbf2 = dh2_dxA_f_ + dh2_dxB_target_xdot_ + ah2_ 
+            cbf3 = dh3_dxA_f_ + dh3_dxB_target_xdot_ + ah3_
+            
+            return [cbf1, cbf2, cbf3]
 
 
 class horizonControl(nn.Module):
 
-    def __init__(self,):
-        super().__init__(params,horizon)
+    def __init__(self,params,horizon):
+        super().__init__()
         self.one_step_forward = closedLoopLayer(Unicycle2D,SingleIntegrator,params[0],params[1],params[2],params[3])  # pass agent and target functions here
         self.horizon = horizon
-
+        self.reward = Unicycle2D.compute_reward_tensor_simple
 
     def forward(self,x_agent,x_target,u_target):
         '''
@@ -181,39 +219,27 @@ class horizonControl(nn.Module):
         inputs = []
         rewards = []
         constraints = []
+        infeasible_constraints = []
+
+        try: 
+            for i in range(self.horizon):
+                u, cons = self.one_step_forward(states[i],x_target[i],u_target[i].reshape(-1,1) )
+                x_1 = dynam(states[i],u)
+                r = self.reward(x_1,x_target[i+1])
+                if r.detach().numpy()<0:  # issue with discrete time!!!!
+                    infeasible_constraints = infeasible_constraints + [r]
+                    break
+                states.append(x_1); inputs.append(u); rewards.append(r); constraints = constraints + cons
+        except:
+            # solve the last one but get required tensors
+            cons = self.one_step_forward(states[i],x_target[i],u_target[i].reshape(-1,1) )
+            infeasible_constraints = infeasible_constraints + cons
         
-        for i in range(self.horizon):
-            u, cons = self.one_step_forward(states[i],x_target[i],u_target[i].reshape(-1,1),dtype=torch.float ))
-            x_1 = dynam(states[i],u)
-            r = reward(x_1,x_target[i+1])
-            states.append(x_1); inputs.append(u); rewards.append(r); constraints = constraints + cons
-            
         return states, \
             inputs, \
+            rewards, \
             constraints, \
-            rewards 
-
-        # Time 1:
-        # s_time = time.time()
-        u0, cons0 = self.one_step_forward(x_agent,x_target[0],torch.tensor( np.array([1.0,0.0]).reshape(-1,1),dtype=torch.float ))
-        x1 = dynam(x_agent,u0)
-        r1 = reward(x1,x_target[1])
-
-        #Time 2: 
-        u1, cons1 = self.one_step_forward(x1,x_target[1],torch.tensor( np.array([1.0,0.0]).reshape(-1,1),dtype=torch.float ))
-        x2 = dynam(x1,u1)
-
-        #Time 3: 
-        u2, cons2 = self.one_step_forward(x2,x_target[2],torch.tensor( np.array([1.0,0.0]).reshape(-1,1),dtype=torch.float ))
-        x3 = dynam(x2,u2)
-
-        #Time 4: 
-        u3, cons3 = self.one_step_forward(x1,x_target[1],torch.tensor( np.array([1.0,0.0]).reshape(-1,1),dtype=torch.float ))
-        x4 = dynam(x1,u3)
-
-        return True, [x1, x2, x3, x4], \
-                [u0, u1, u2, u3], \
-                [cons0, cons1, cons2, cons3]
+            infeasible_constraints 
                 
 
 
@@ -234,51 +260,106 @@ def train(args):
     ax.set_aspect(1)
 
     # set robots
-    t = 0
     dt = args.dt
     
     params = np.array([args.alpha1, args.alpha2, args.alpha3, args.k])
+    mpc = horizonControl(params,args.horizon)
     
-    # Initialize tensor list
+    # Initialize agents
     agentF = Unicycle2D(np.array([0,0.2,0]),dt,3,FoV,max_D,min_D)
     agentT = SingleIntegrator(np.array([1,0]),dt,ax,0)
+    
+    forward = False
+    current_horizon = 0
+    episode_time = 0
 
     for ep in range(args.episodes):
-       
-        Fx = torch.tensor(agentF.X.reshape(-1,1),dtype=torch.float, requires_grad=True)
-        Tx = torch.tensor(agentT.X.reshape(-1,1),dtype=torch.float, requires_grad=True)
         
-        # produce leader trajectory only
-        TXs = [agentT.X]
+        print(f"params:{params}")
+        
+        episode_time = episode_time + 1 if forward == True else episode_time      
+         
+        # Initialize tensor list               
+        Fx = torch.tensor(agentF.X.reshape(-1,1),dtype=torch.float, requires_grad=True)
+        TXs = [torch.tensor(agentT.X, dtype=torch.float)]
         TUs = []
+
+        # Produce leader trajectory only
         for horizon_step in range(args.horizon):
             uL = 0.5
-            vL = 2.6*np.sin(np.pi*t_roll) #  0.1 # 1.2
+            vL = 2.6*np.sin(np.pi*(episode_time+horizon_step)*dt) #  0.1 # 1.2
             
-            TUs.append(np.array([uL,vL]))
+            TUs.append(torch.tensor(np.array([uL,vL]),dtype=torch.float))
             agentT.step(uL,vL) 
-            TXs.append(agentT.X)
-            
+            TXs.append(torch.tensor(agentT.X, dtype=torch.float))
+        agentT.X = TXs[0].detach().numpy() 
         ## Forward it to Network        
-        mpc = horizonControl()
-        success, x, u, cons = mpc(Fx,[Tx,Tx,Tx,Tx])
-        
-        
-        
+        x, u, r, cons, infeasible_cons = mpc(Fx,TXs,TUs)
+        success = len(infeasible_cons)==0           
+
+        # Update Parameters
         if success:
             print("Parameter Successful! -> Improving PERFORMANCE")
-            updateParameterPerformance(mpc,params,args.lr_beta)
+            print(f"current horizon:{len(x)-1}")
+            update, params = updateParameterPerformance(mpc,params,args.lr_beta,r,cons)  
+            if update:
+                mpc.one_step_forward.updateParams(params)
+                forward = True
+                current_horizon = args.horizon
+            else:
+                exit()
+
+        else: 
+            print("Parameter Unsuccessful -> Improving FEASIBILITY")
+            print(f"current horizon:{len(x)-1}")
+            if (len(x)-1)>current_horizon or (len(x)-1)==args.horizon:
+                current_horizon = len(x)-1
+                forward = True
+            else:
+                forward = False
+            update, params = updateParameterFeasibility(mpc,params,args.lr_beta,cons,infeasible_cons)  
+            if update:
+                mpc.one_step_forward.updateParams(params)
+            else:
+                exit()
+        
+        if len(u)>0:
+            # print(f"u:{u[0].detach().numpy()}")
+            # Move agent one step        
+            agentF.step(u[0].detach().numpy())  
+            agentT.step(TUs[0][0],TUs[0][1]) 
+
+            # Visulaize one step motion with animation plot
+            if args.animate_episode:
+                lines, areas, bodyF = agentF.render(lines,areas,bodyF)
+                bodyT = agentT.render(bodyT)
+                bodyF_tensor.set_offsets([x[1].detach().numpy()[0,0],x[1].detach().numpy()[1,0]])        
+                fig.canvas.draw()
+                fig.canvas.flush_events()     
+        
+            # Visualize predicted horizon
+            if args.animate_horizon:
+                for i in range(len(x)):
+                    lines, areas, bodyF = agentF.render_state(lines,areas,bodyF,x[i].detach().numpy())
+                    bodyT = agentT.render_state(bodyT,TXs[i].detach().numpy())
+                    bodyF_tensor.set_offsets([x[i].detach().numpy()[0,0],x[i].detach().numpy()[1,0]])        
+                    fig.canvas.draw()
+                    fig.canvas.flush_events()    
+        print("forward: ", forward)
+        # print("DONE")
 
 
 parser = argparse.ArgumentParser(description='adaptive_qp')
-args = parser.parse_args("")
 parser.add_argument('--alpha1', type=float, default=1.0, metavar='G',help='CBF parameter')  
 parser.add_argument('--alpha2', type=float, default=0.7, metavar='G',help='CBF parameter')  
 parser.add_argument('--alpha3', type=float, default=0.7, metavar='G',help='CBF parameter')  
 parser.add_argument('--k', type=float, default=0.1, metavar='G',help='CLF parameter') 
-parser.add_argument('--episodes', type=int, default=1, metavar='N',help='total training episodes') 
-parser.add_argument('--horizon', type=int, default=100, metavar='N',help='total training episodes') v
-parser.add_argument('--lr_beta', type=float, default=0.03, metavar='G',help='learning rate of parameter')  #0.003
+parser.add_argument('--episodes', type=int, default=60, metavar='N',help='total training episodes') 
+parser.add_argument('--horizon', type=int, default=10, metavar='N',help='total training episodes')
+parser.add_argument('--lr_beta', type=float, default=1.0, metavar='G',help='learning rate of parameter')  #0.003
 parser.add_argument('--dt', type=float, default="0.01")
+parser.add_argument('--animate_episode', type=bool, default=True)
+parser.add_argument('--animate_horizon', type=bool, default=False)
 
+args = parser.parse_args("")
 train(args)

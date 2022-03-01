@@ -8,8 +8,10 @@ from tensor_utils import wrap_angle_tensor
 dt = 0.01
 
 FoV_angle = 60*np.pi/180
+FoV_length = 3
 max_D = 3
 min_D = 0.3
+u_max = [0.05,0.05]
 
 def fx_(x):
     return x + torch.tensor(np.array([0.0,0.0,0.0]).reshape(-1,1)*dt,dtype=torch.float)
@@ -86,6 +88,8 @@ objective = cp.Minimize(cp.sum_squares(u-U_d) + 100*delta)
 # CLF constraint
 const = [dV_dxA_f + dV_dxA_g @ u + dV_dxB_target_xdot <= -kV + delta]
 const += [delta>=0]
+const += [cp.abs(u[0])<=u_max[0]]
+const += [cp.abs(u[1])<=u_max[1]]
 
 # CBF constraints
 const += [dh1_dxA_f + dh1_dxA_g @ u + dh1_dxB_target_xdot >= -ah1 ]
@@ -95,7 +99,39 @@ const += [dh3_dxA_f + dh3_dxA_g @ u + dh3_dxB_target_xdot >= -ah3 ]
 problem = cp.Problem(objective,const)
 assert problem.is_dpp()
 
+solver_args = {
+            'verbose': False
+        }
+
 cvxpylayer = CvxpyLayer(problem, parameters=[U_d, ah1,dh1_dxA_f, dh1_dxA_g,dh1_dxB_target_xdot, ah2,dh2_dxA_f, dh2_dxA_g,dh2_dxB_target_xdot, ah3,dh3_dxA_f,dh3_dxA_g,dh3_dxB_target_xdot,  kV,dV_dxA_f,dV_dxA_g,dV_dxB_target_xdot  ], variables=[u])
+
+## Relaxed Problem
+delta1 = cp.Variable(1)
+delta2 = cp.Variable(1)
+delta3 = cp.Variable(1)
+# CLF constraint
+const_ = [dV_dxA_f + dV_dxA_g @ u + dV_dxB_target_xdot <= -kV + delta]
+const_ += [delta>=0]
+
+# CBF constraints
+const_ += [dh1_dxA_f + dh1_dxA_g @ u + dh1_dxB_target_xdot >= -ah1 - delta1]
+const_ += [dh2_dxA_f + dh2_dxA_g @ u + dh2_dxB_target_xdot >= -ah2 - delta2]
+const_ += [dh3_dxA_f + dh3_dxA_g @ u + dh3_dxB_target_xdot >= -ah3 - delta3]
+const_ += [delta1 >= 0]
+const_ += [delta2 >= 0]
+const_ += [delta3 >= 0]
+
+objective1 = cp.Minimize(100000*delta1 + 100000*delta2 + delta3)
+objective2 = cp.Minimize(delta1 + 100000*delta2 + 100000*delta3)
+objective3 = cp.Minimize(100000*delta1 + delta2 + 100000*delta3)
+
+problem_relaxed1 = cp.Problem(objective1, const_)
+problem_relaxed2 = cp.Problem(objective2, const_)
+problem_relaxed3 = cp.Problem(objective3, const_)
+
+cvxpylayer_relaxed1 = CvxpyLayer(problem_relaxed1, parameters=[ah1,dh1_dxA_f, dh1_dxA_g,dh1_dxB_target_xdot, ah2,dh2_dxA_f, dh2_dxA_g,dh2_dxB_target_xdot, ah3,dh3_dxA_f,dh3_dxA_g,dh3_dxB_target_xdot,  kV,dV_dxA_f,dV_dxA_g,dV_dxB_target_xdot  ], variables=[delta1])
+cvxpylayer_relaxed2 = CvxpyLayer(problem_relaxed2, parameters=[ah1,dh1_dxA_f, dh1_dxA_g,dh1_dxB_target_xdot, ah2,dh2_dxA_f, dh2_dxA_g,dh2_dxB_target_xdot, ah3,dh3_dxA_f,dh3_dxA_g,dh3_dxB_target_xdot,  kV,dV_dxA_f,dV_dxA_g,dV_dxB_target_xdot  ], variables=[delta2])
+cvxpylayer_relaxed3 = CvxpyLayer(problem_relaxed3, parameters=[ah1,dh1_dxA_f, dh1_dxA_g,dh1_dxB_target_xdot, ah2,dh2_dxA_f, dh2_dxA_g,dh2_dxB_target_xdot, ah3,dh3_dxA_f,dh3_dxA_g,dh3_dxB_target_xdot,  kV,dV_dxA_f,dV_dxA_g,dV_dxB_target_xdot  ], variables=[delta3])
 
 class Unicycle2D:
     
@@ -182,6 +218,34 @@ class Unicycle2D:
 
         P1 = x + self.FoV_length*e1
         P2 = x + self.FoV_length*e2  
+
+        triangle_hx = [x[0] , P1[0], P2[0], x[0] ]
+        triangle_hy = [x[1] , P1[1], P2[1], x[1] ]
+        
+        triangle_v = [ x,P1,P2,x ]  
+
+        # lines.set_data(triangle_hx,triangle_hy)
+        areas.set_xy(triangle_v)
+
+        # scatter plot update
+        body.set_offsets([x[0],x[1]])
+
+        return lines, areas, body
+    
+    def render_state(self,lines,areas,body,X):
+        # length = 3
+        # FoV = np.pi/3   # 60 degrees
+
+        x = np.array([X[0,0],X[1,0]])
+  
+        theta = X[2][0]
+        theta1 = theta + FoV_angle/2
+        theta2 = theta - FoV_angle/2
+        e1 = np.array([np.cos(theta1),np.sin(theta1)])
+        e2 = np.array([np.cos(theta2),np.sin(theta2)])
+
+        P1 = x + FoV_length*e1
+        P2 = x + FoV_length*e2  
 
         triangle_hx = [x[0] , P1[0], P2[0], x[0] ]
         triangle_hy = [x[1] , P1[1], P2[1], x[1] ]
@@ -652,6 +716,24 @@ class Unicycle2D:
         bearing_vector = torch.cat( ( torch.cos(x[2,0]).reshape(-1,1), torch.sin(x[2,0]).reshape(-1,1) ) )
         bearing_angle = torch.matmul ( bearing_vector.T , diff ) /torch.norm(diff)
         h3 = (bearing_angle - np.cos(self.FoV_angle/2))[0]/(1.0-np.cos(self.FoV_angle/2))
+        # reward is minimum reward
+
+
+        reward = torch.minimum(torch.minimum(h1,h2),h3)
+        return reward
+    
+    def compute_reward_tensor_simple(x,targetX):
+        diff = targetX - x[0:2]  # row vector
+
+        # Max distance
+        h1 = (max_D**2 - torch.norm( diff )**2)/(max_D**2-min_D**2)
+
+        # Min distance
+        h2 = (torch.norm( diff )**2 - min_D**2)/(max_D**2-min_D**2)
+        # Max angle
+        bearing_vector = torch.cat( ( torch.cos(x[2,0]).reshape(-1,1), torch.sin(x[2,0]).reshape(-1,1) ) )
+        bearing_angle = torch.matmul ( bearing_vector.T , diff ) /torch.norm(diff)
+        h3 = (bearing_angle - np.cos(FoV_angle/2))[0]/(1.0-np.cos(FoV_angle/2))
         # reward is minimum reward
 
 
