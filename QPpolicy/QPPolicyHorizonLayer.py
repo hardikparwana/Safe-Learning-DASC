@@ -345,7 +345,7 @@ def train(args):
                     bodyF_tensor.set_offsets([x[i].detach().numpy()[0,0],x[i].detach().numpy()[1,0]])        
                     fig.canvas.draw()
                     fig.canvas.flush_events()    
-        print("forward: ", forward)
+        print(f"forward: {forward}, start time:{episode_time}")
         # print("DONE")
 
 
@@ -354,7 +354,7 @@ parser.add_argument('--alpha1', type=float, default=1.0, metavar='G',help='CBF p
 parser.add_argument('--alpha2', type=float, default=0.7, metavar='G',help='CBF parameter')  
 parser.add_argument('--alpha3', type=float, default=0.7, metavar='G',help='CBF parameter')  
 parser.add_argument('--k', type=float, default=0.1, metavar='G',help='CLF parameter') 
-parser.add_argument('--episodes', type=int, default=60, metavar='N',help='total training episodes') 
+parser.add_argument('--episodes', type=int, default=200, metavar='N',help='total training episodes') 
 parser.add_argument('--horizon', type=int, default=10, metavar='N',help='total training episodes')
 parser.add_argument('--lr_beta', type=float, default=1.0, metavar='G',help='learning rate of parameter')  #0.003
 parser.add_argument('--dt', type=float, default="0.01")

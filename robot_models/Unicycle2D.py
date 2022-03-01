@@ -92,9 +92,9 @@ const += [cp.abs(u[0])<=u_max[0]]
 const += [cp.abs(u[1])<=u_max[1]]
 
 # CBF constraints
-const += [dh1_dxA_f + dh1_dxA_g @ u + dh1_dxB_target_xdot >= -ah1 ]
-const += [dh2_dxA_f + dh2_dxA_g @ u + dh2_dxB_target_xdot >= -ah2 ]
-const += [dh3_dxA_f + dh3_dxA_g @ u + dh3_dxB_target_xdot >= -ah3 ]
+const += [dh1_dxA_f + dh1_dxA_g @ u + dh1_dxB_target_xdot >= -ah1 + 0.1]
+const += [dh2_dxA_f + dh2_dxA_g @ u + dh2_dxB_target_xdot >= -ah2 + 0.1]
+const += [dh3_dxA_f + dh3_dxA_g @ u + dh3_dxB_target_xdot >= -ah3 + 0.1]
 # const += [alpha >= -20]
 problem = cp.Problem(objective,const)
 assert problem.is_dpp()
