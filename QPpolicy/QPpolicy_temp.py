@@ -480,16 +480,16 @@ for Alpha in Alphas:
 
             # axis2[1].plot(t_plot,deltas,c = 'r',label='slack')
 
-            if index == 0:
-                mark = '--'
-            if index == 1:
-                mark = '.'
+            # if index == 0:
+            #     mark = '--'
+            # if index == 1:
+            #     mark = '.'
             # Barrier Function Plots
-            axis3.plot(t_plot,h1s,('g' + mark),label = 'h1 '+ name)
+            axis3.plot(t_plot,h1s,colors[index])
             # style = colors[index]+'.'
             # print(style)
-            axis3.plot(t_plot,h2s,('b'+mark),label = 'h2 ' + name)
-            axis3.plot(t_plot,h3s,('k'+mark),label = 'h3 ' + name)
+            axis3.plot(t_plot,h2s,colors[index], linestyle='dashed')
+            axis3.plot(t_plot,h3s,colors[index],linestyle='dotted')
 
             # Target Movement Plot
             axis4[0].plot(t_plot,[x[0] for x in TXs],c = 'r',label='X')
@@ -536,7 +536,7 @@ axis3.set_title("Barrier Functions")#,y=1.0,pad=-14)
 axis3.set_xlabel('time (s)')
 axis3.legend()
 # figure3.savefig("unicycle_barrier.png")
-# figure3.savefig("unicycle_barrier.eps")
+figure3.savefig("unicycle_barrier2.eps")
 
 axis4[0].set_title('Target Position')
 axis4[0].legend()
@@ -553,7 +553,6 @@ axis5[1].legend()
 axis5[1].set_xlabel('time (s)')
 # figure5.savefig("unicycle_inputs.png")
 # figure5.savefig("unicycle_inputs.eps")
-
 
 plt.show()
             
