@@ -313,7 +313,7 @@ def train(args):
 
         else: 
             print("Parameter Unsuccessful -> Improving FEASIBILITY")
-            print(f"current horizon:{len(x)-1}")
+            print(f"current horizon:{len(x)-1}, last input:{u[-1]}")
             if (len(x)-1)>current_horizon or (len(x)-1)==args.horizon:
                 current_horizon = len(x)-1
                 forward = True
