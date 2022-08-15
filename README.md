@@ -1,8 +1,10 @@
 # Safe-Learning-DASC
 
 This repository implements our ICRA 2022 submission on 
-https://ieeexplore.ieee.org/abstract/document/9812398
+
 **Recursive Feasibility Guided Optimal Parameter Adaptation of Differential Convex Optimization Policies for Safety-Critical Systems**
+
+https://ieeexplore.ieee.org/abstract/document/9812398
 
 Authors: Hardik Parwana and Dimitra Panagou, University of Michigan
 
